@@ -30,12 +30,12 @@ class AVE(Dataset):
 
     def __getitem__(self, idx):
         video_id = self.videos_ids[idx]
-        vr = decord.VideoReader(os.path.join(self.video_dir_path, video_id))
-
-        return vr[:], self.video_annotation_dict[video_id]
+        av = decord.AVReader(os.path.join(self.video_dir_path, video_id))
+        audio, video = av[:]
+        return audio, video, self.video_annotation_dict[video_id]
 
 
 # if __name__ == '__main__':
 #     dataset = AVE("/cortex/data/images/AVE_Dataset/AVE", 
 #                   "/cortex/data/images/AVE_Dataset/Annotations.txt")
-#     print("SDads")s
+#     print("SDads")
