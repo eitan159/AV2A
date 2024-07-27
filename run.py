@@ -1,6 +1,3 @@
-import os
-import sys
-import contextlib
 import numpy as np
 import torch
 from models.imagebindmodel.imagebind import data
@@ -8,8 +5,6 @@ from models.imagebindmodel.imagebind.models import imagebind_model
 from models.imagebindmodel.imagebind.models.imagebind_model import ModalityType
 from utils.video_pp import convert_video_to_sorted_frames, extract_frames, get_frame_number
 
-FPS = 1
-FRAME_OUTPUT_DIR = "/home/shaulov/work/zeroshot_AVE/output_frames"
 threshold = 0.5
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
@@ -18,31 +13,23 @@ model = imagebind_model.imagebind_huge(pretrained=True)
 model.eval()
 model.to(device)
 
-def run(video_paths, labels):
-
-    video_events_dict = {}
-    for video_path in video_paths:
-        sorted_frame_paths = convert_video_to_sorted_frames(video_path, FRAME_OUTPUT_DIR, FPS)
-
-        with torch.no_grad():
-            embeddings = model(get_inputs_for_image_bind(sorted_frame_paths, labels))
-
+def run(labels, frames, audio_file_name, modality_inputs):
+    with torch.no_grad():
+        embeddings = model(modality_inputs)
         video_text_similarity = torch.softmax(embeddings[ModalityType.VISION] @ embeddings[ModalityType.TEXT].T, dim=-1)
-        image_events_dict = {}      
-        for event_dim in range(video_text_similarity.shape[0]):
-            tensor_slice_np = video_text_similarity[event_dim].cpu().numpy()
-            indices = np.where(tensor_slice_np > threshold)[0]
-            events = [labels[i] for i in indices]
-            # values = tensor_slice_np[indices]
+        # audio_text_similarity = torch.softmax(embeddings[ModalityType.VISION] @ embeddings[ModalityType.AUDIO].T, dim=-1)
 
-            image_events_dict[f"frame-{event_dim}"] = events
+    image_events_dict = {}      
+    for event_dim in range(video_text_similarity.shape[0]):
+        tensor_slice_np = video_text_similarity[event_dim].cpu().numpy()
+        indices = np.where(tensor_slice_np > threshold)[0]
+        events = [labels[i] for i in indices]
+        # values = tensor_slice_np[indices]
+        image_events_dict[f"frame-{event_dim}"] = events
 
 
-        single_video_events = optimize_video_events(image_events_dict)
-        video_events_dict[video_path] = single_video_events
-
-        
-    print(video_text_similarity)
+    single_video_events = optimize_video_events(image_events_dict)
+    print(single_video_events)
 
 
 
@@ -85,11 +72,9 @@ def get_inputs_for_image_bind(sorted_frame_paths, labels):
 
 
 
-if __name__ == '__main__':
-    # video_paths = ['/home/shaulov/work/zeroshot_AVE/MH3m4AwEcRY.mp4']
-    # video_paths = ['/home/shaulov/work/zeroshot_AVE/eRF4KAXdn0w.mp4']
-    video_paths = ['/home/shaulov/work/zeroshot_AVE/Zlwu4AROYzg.mp4']
-    labels = ['Church bell', 'Bark', 'Male speech,', 'Fixed-wing aircraft','Race car','Female speech', 'Violin', 'Flute','Ukulele', 'Frying','ariel']
-    run(video_paths, labels)
+# if __name__ == '__main__':
+#     video_paths = ['/home/shaulov/work/zeroshot_AVE/Zlwu4AROYzg.mp4']
+#     labels = ['Church bell', 'Bark', 'Male speech,', 'Fixed-wing aircraft','Race car','Female speech', 'Violin', 'Flute','Ukulele', 'Frying','ariel']
+#     run(labels, frames, audio_file_name)
 
 
