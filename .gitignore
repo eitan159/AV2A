@@ -1,5 +1,7 @@
 *.pth
 *.mp4
+*.mp3
 *.jpg
 cache_dir/
 .checkpoints/
+__pycache__
