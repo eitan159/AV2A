@@ -1,5 +1,6 @@
 *.pth
 *.mp4
 *.jpg
+*.png
 cache_dir/
 .checkpoints/

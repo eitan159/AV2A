@@ -13,16 +13,16 @@ from types import SimpleNamespace
 import torch
 import torch.nn as nn
 
-from imagebind.models.helpers import (EinOpsRearrange, LearnableLogitScaling, Normalize,
+from models.imagebindmodel.imagebind.models.helpers import (EinOpsRearrange, LearnableLogitScaling, Normalize,
                             SelectElement, SelectEOSAndProject)
-from imagebind.models.multimodal_preprocessors import (AudioPreprocessor,
+from models.imagebindmodel.imagebind.models.multimodal_preprocessors import (AudioPreprocessor,
                                              IMUPreprocessor, PadIm2Video,
                                              PatchEmbedGeneric,
                                              RGBDTPreprocessor,
                                              SpatioTemporalPosEmbeddingHelper,
                                              TextPreprocessor,
                                              ThermalPreprocessor)
-from imagebind.models.transformer import MultiheadAttention, SimpleTransformer
+from models.imagebindmodel.imagebind.models.transformer import MultiheadAttention, SimpleTransformer
 
 ModalityType = SimpleNamespace(
     VISION="vision",

@@ -19,14 +19,14 @@ from pytorchvideo.data.encoded_video import EncodedVideo
 from torchvision import transforms
 from torchvision.transforms._transforms_video import NormalizeVideo
 
-from imagebind.models.multimodal_preprocessors import SimpleTokenizer
+from models.imagebindmodel.imagebind.models.multimodal_preprocessors import SimpleTokenizer
 
 DEFAULT_AUDIO_FRAME_SHIFT_MS = 10  # in milliseconds
 
 
 def return_bpe_path():
     return pkg_resources.resource_filename(
-        "imagebind", "bpe/bpe_simple_vocab_16e6.txt.gz"
+        "models.imagebindmodel.imagebind", "bpe/bpe_simple_vocab_16e6.txt.gz"
     )
 
 
