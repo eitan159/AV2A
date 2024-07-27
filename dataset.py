@@ -1,14 +1,19 @@
 from torch.utils.data import Dataset
-import decord
 import os
-decord.bridge.set_bridge('torch')
+from moviepy.editor import VideoFileClip
+import torch
+import random
+from PIL import Image
 
 class AVE(Dataset):
-    def __init__(self, video_dir_path, annotations_file_path) -> None:
+    def __init__(self, video_dir_path, annotations_file_path, frames_transforms=None) -> None:
         self.video_dir_path = video_dir_path
+        self.frames_transforms = frames_transforms
+        self.audio_file_name = "output_audio.mp3"
         self.videos_ids = [video_id for video_id in os.listdir(video_dir_path) 
                            if os.path.splitext(os.path.join(self.video_dir_path, video_id))[1] == '.mp4']
         
+
         self.video_annotation_dict = {}
         with open(annotations_file_path, "r") as f:
             data = f.read().strip().split("\n")
@@ -30,12 +35,31 @@ class AVE(Dataset):
 
     def __getitem__(self, idx):
         video_id = self.videos_ids[idx]
-        av = decord.AVReader(os.path.join(self.video_dir_path, video_id))
-        audio, video = av[:]
-        return audio, video, self.video_annotation_dict[video_id]
+        video_path = os.path.join(self.video_dir_path, video_id)
+        video = VideoFileClip(video_path) 
+
+        audio = video.audio
+        # Save the audio to a file
+        audio.write_audiofile(self.audio_file_name)
+
+        frames = []
+        fps = int(video.fps)
+        for t in range(int(video.duration)):
+            start_frame = random.randint(1, fps - 1)
+            frame = video.get_frame(t + (start_frame / fps))
+            frame = Image.fromarray(frame) # not good but for now it's ok
+            if self.frames_transforms:
+                frame = self.frames_transforms(frame)
+
+            frames.append(frame)
+
+        frames = torch.stack(frames)
+
+        return frames, self.audio_file_name, self.video_annotation_dict[video_id]
 
 
 # if __name__ == '__main__':
 #     dataset = AVE("/cortex/data/images/AVE_Dataset/AVE", 
 #                   "/cortex/data/images/AVE_Dataset/Annotations.txt")
+#     a = dataset[3]
 #     print("SDads")
