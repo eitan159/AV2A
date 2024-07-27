@@ -6,4 +6,3 @@
 cache_dir/
 .checkpoints/
 __pycache__/
-models/
