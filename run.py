@@ -31,7 +31,6 @@ def run(labels, frames, audio_file_name, modality_inputs):
     print(single_video_events)
 
 
-
 def optimize_video_events(image_events_dict):
     transformed_dict = {}
     sorted_frames = sorted(image_events_dict.keys(), key=lambda x: int(x.split('-')[1]))
