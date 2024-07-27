@@ -37,10 +37,6 @@ def predict(labels, frames, audio_file):
     #     torch.softmax(embeddings[ModalityType.AUDIO] @ embeddings[ModalityType.TEXT].T, dim=-1),
     # )
        
-
-
-
-
 if __name__ == '__main__':
     dataset = AVE("/media/data2/shaulov/AVE_Dataset/AVE", #extract those to the argparse
                   "/media/data2/shaulov/AVE_Dataset/Annotations.txt",

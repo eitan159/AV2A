@@ -3,7 +3,6 @@ import torch
 from models.imagebindmodel.imagebind import data
 from models.imagebindmodel.imagebind.models import imagebind_model
 from models.imagebindmodel.imagebind.models.imagebind_model import ModalityType
-from utils.video_pp import convert_video_to_sorted_frames, extract_frames, get_frame_number
 
 threshold = 0.5
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -59,17 +58,6 @@ def optimize_video_events(image_events_dict):
         ]
 
     return transformed_dict
-
-
-
-def get_inputs_for_image_bind(sorted_frame_paths, labels):
-    input =  {
-        ModalityType.TEXT: data.load_and_transform_text(labels, device),
-        ModalityType.VISION: data.load_and_transform_vision_data(sorted_frame_paths, device),
-    }
-
-    return input
-
 
 
 # if __name__ == '__main__':

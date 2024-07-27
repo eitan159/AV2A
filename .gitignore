@@ -4,5 +4,6 @@
 *.jpg
 *.png
 cache_dir/
+models/
 .checkpoints/
-__pycache__
+__pycache__/
