@@ -4,6 +4,6 @@
 *.jpg
 *.png
 cache_dir/
-work/zeroshot_AVE/models/
 .checkpoints/
 __pycache__/
+models/
