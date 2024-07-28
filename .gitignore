@@ -2,6 +2,7 @@
 *.mp4
 *.mp3
 *.jpg
+*.vscode
 cache_dir/
 .checkpoints/
 __pycache__
