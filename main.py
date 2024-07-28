@@ -7,22 +7,27 @@ from dataset import AVE
 import argparse
 import numpy as np
 from data_transforms import image_transforms_imagebind
+import os
 
-def predict(labels, frames, audio_file_name):
+def predict(labels, frames, audio_files):
     modality_inputs = {
         ModalityType.TEXT: load_and_transform_text(labels, device),
         ModalityType.VISION: frames.to(device),
-        # ModalityType.AUDIO: load_and_transform_audio_data([audio_file], device),
+        ModalityType.AUDIO: load_and_transform_audio_data(audio_files, device),
     }
 
     with torch.no_grad():
         embeddings = model(modality_inputs)
-        video_text_similarity = torch.softmax(embeddings[ModalityType.VISION] @ embeddings[ModalityType.TEXT].T, dim=-1)
-        # audio_text_similarity = torch.softmax(embeddings[ModalityType.VISION] @ embeddings[ModalityType.AUDIO].T, dim=-1)
+    
+    video_text_similarity = embeddings[ModalityType.VISION] @ embeddings[ModalityType.TEXT].T   
+    audio_text_similarity = (embeddings[ModalityType.VISION] @ embeddings[ModalityType.AUDIO].T).repeat_interleave(2)
+    similarities = alpha * video_text_similarity + (1 - alpha) * audio_text_similarity
+    similarities = torch.softmax(similarities, dim=-1)
+    # audio_text_similarity = torch.softmax(embeddings[ModalityType.VISION] @ embeddings[ModalityType.AUDIO].T, dim=-1)
 
     image_events_dict = {}      
-    for event_dim in range(video_text_similarity.shape[0]):
-        tensor_slice_np = video_text_similarity[event_dim].cpu().numpy()
+    for event_dim in range(similarities.shape[0]):
+        tensor_slice_np = similarities[event_dim].cpu().numpy()
         indices = np.where(tensor_slice_np > threshold)[0]
         events = [labels[i] for i in indices]
         # values = tensor_slice_np[indices]
@@ -67,12 +72,14 @@ if __name__ == '__main__':
     parser.add_argument('--annotations_file_path', required=True, type=str)
     parser.add_argument('--gpu_id', default=-1, type=int)
     parser.add_argument('--threshold', default=0.5, type=float)
+    parser.add_argument('--alpha', default=0.5, type=float)
 
     args = parser.parse_args()
 
     threshold = args.threshold
-
-    dataset = AVE(args.video_dir_path, #extract those to the argparse
+    alpha = args.alpha
+    
+    dataset = AVE(args.video_dir_path,
                   args.annotations_file_path,
                   frames_transforms=image_transforms_imagebind)
     
@@ -84,5 +91,6 @@ if __name__ == '__main__':
     model.to(device)
 
     for sample in dataset:
-        frames, audio_file_name, label_dict = sample
-        predict(labels, frames, audio_file_name)
+        frames, audio_dir, label_dict = sample
+        audio_paths = [f"{dataset.audio_dir}/{file_name}" for file_name in os.listdir(dataset.audio_dir)]
+        predict(labels, frames, audio_paths)

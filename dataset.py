@@ -4,12 +4,19 @@ from moviepy.editor import VideoFileClip
 import torch
 import random
 from PIL import Image
+import os
+
+def remove_files_from_dir(dir_path):
+    for filename in os.listdir(dir_path):
+        file_path = os.path.join(dir_path, filename)
+        if os.path.isfile(file_path):
+            os.remove(file_path)
 
 class AVE(Dataset):
     def __init__(self, video_dir_path, annotations_file_path, frames_transforms=None) -> None:
         self.video_dir_path = video_dir_path
         self.frames_transforms = frames_transforms
-        self.audio_file_name = "output_audio.mp3"
+        self.audio_dir = "sample_audio_chunks"
         self.videos_ids = [video_id for video_id in os.listdir(video_dir_path) 
                            if os.path.splitext(os.path.join(self.video_dir_path, video_id))[1] == '.mp4']
         
@@ -39,8 +46,15 @@ class AVE(Dataset):
         video = VideoFileClip(video_path) 
 
         audio = video.audio
+
         # Save the audio to a file
-        audio.write_audiofile(self.audio_file_name)
+        if not os.path.exists(self.audio_dir):
+            os.makedirs(self.audio_dir)
+        remove_files_from_dir(self.audio_dir)
+        
+        for i, t in enumerate(range(0, int(audio.duration), 2)):
+            audio_chunk = audio.subclip(t_start=t, t_end=t + 2)
+            audio_chunk.write_audiofile(f"{self.audio_dir}/output_segment_{i}.mp3")
 
         frames = []
         fps = int(video.fps)
@@ -55,7 +69,7 @@ class AVE(Dataset):
 
         frames = torch.stack(frames)
 
-        return frames, self.audio_file_name, self.video_annotation_dict[video_id]
+        return frames, self.audio_dir, self.video_annotation_dict[video_id]
 
 
 # if __name__ == '__main__':
