@@ -26,6 +26,8 @@ def predict(labels, frames, audio_files):
     audio_text_similarity = torch.softmax(audio_text_similarity, dim=-1)
 
     similarities = alpha * video_text_similarity + (1 - alpha) * audio_text_similarity
+    similarities = torch.softmax(similarities, dim=-1)
+
     # similarities = torch.softmax(similarities, dim=-1)
     
     image_events_dict = {}
