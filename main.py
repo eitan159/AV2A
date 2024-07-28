@@ -20,12 +20,15 @@ def predict(labels, frames, audio_files):
         embeddings = model(modality_inputs)
     
     video_text_similarity = embeddings[ModalityType.VISION] @ embeddings[ModalityType.TEXT].T   
-    audio_text_similarity = (embeddings[ModalityType.VISION] @ embeddings[ModalityType.AUDIO].T).repeat_interleave(2)
-    similarities = alpha * video_text_similarity + (1 - alpha) * audio_text_similarity
-    similarities = torch.softmax(similarities, dim=-1)
-    # audio_text_similarity = torch.softmax(embeddings[ModalityType.VISION] @ embeddings[ModalityType.AUDIO].T, dim=-1)
+    audio_text_similarity = (embeddings[ModalityType.AUDIO] @ embeddings[ModalityType.TEXT].T).repeat_interleave(2, dim=0)
+    
+    video_text_similarity = torch.softmax(video_text_similarity, dim=-1)
+    audio_text_similarity = torch.softmax(audio_text_similarity, dim=-1)
 
-    image_events_dict = {}      
+    similarities = alpha * video_text_similarity + (1 - alpha) * audio_text_similarity
+    # similarities = torch.softmax(similarities, dim=-1)
+    
+    image_events_dict = {}
     for event_dim in range(similarities.shape[0]):
         tensor_slice_np = similarities[event_dim].cpu().numpy()
         indices = np.where(tensor_slice_np > threshold)[0]

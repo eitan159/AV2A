@@ -54,7 +54,7 @@ class AVE(Dataset):
         
         for i, t in enumerate(range(0, int(audio.duration), 2)):
             audio_chunk = audio.subclip(t_start=t, t_end=t + 2)
-            audio_chunk.write_audiofile(f"{self.audio_dir}/output_segment_{i}.mp3")
+            audio_chunk.write_audiofile(f"{self.audio_dir}/output_segment_{i}.wav")
 
         frames = []
         fps = int(video.fps)
