@@ -38,7 +38,9 @@ class AVE(Dataset):
                                                     'class_idx': self.class2idx[category],
                                                     'start': int(start),
                                                     'end': int(end)}
-
+        
+        self.videos_ids = [video_id for video_id in self.videos_ids if video_id in self.video_annotation_dict]
+        
     def __len__(self):
         return len(self.videos_ids)
 
@@ -53,10 +55,6 @@ class AVE(Dataset):
         if not os.path.exists(self.audio_dir):
             os.makedirs(self.audio_dir)
         remove_files_from_dir(self.audio_dir)
-        
-        # for i, t in enumerate(range(0, int(audio.duration), 2)):
-        #     audio_chunk = audio.subclip(t_start=t, t_end=t + 2)
-        #     audio_chunk.write_audiofile(f"{self.audio_dir}/output_segment_{i}.wav")
 
         for i, t in enumerate(range(0, int(audio.duration), 2)):
             audio_chunk = audio.subclip(t_start=t, t_end=t + 2)
@@ -77,10 +75,3 @@ class AVE(Dataset):
         frames = torch.stack(frames)
 
         return frames, self.audio_dir, self.video_annotation_dict[video_id], video_id
-
-
-# if __name__ == '__main__':
-#     dataset = AVE("/cortex/data/images/AVE_Dataset/AVE", 
-#                   "/cortex/data/images/AVE_Dataset/Annotations.txt")
-#     a = dataset[3]
-#     print("SDads")
