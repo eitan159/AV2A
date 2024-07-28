@@ -39,8 +39,9 @@ def predict(labels, frames, audio_files):
         image_events_dict[f"frame-{event_dim}"] = events
 
 
-    single_video_events = optimize_video_events(image_events_dict)
-    print(single_video_events)
+    unfiltered_video_events = optimize_video_events(image_events_dict)
+    video_events = filter_events(unfiltered_video_events)
+    print(video_events)
 
 
 def optimize_video_events(image_events_dict):
@@ -70,13 +71,24 @@ def optimize_video_events(image_events_dict):
 
     return transformed_dict
 
+
+def filter_events(events_dict):
+    filtered_events = {}
+    
+    for key, intervals in events_dict.items():
+        filtered_intervals = [interval for interval in intervals if len(interval) == 2 and interval[1] - interval[0] > 1]
+        if filtered_intervals:
+            filtered_events[key] = filtered_intervals
+    
+    return filtered_events
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--video_dir_path', required=True, type=str)
     parser.add_argument('--annotations_file_path', required=True, type=str)
     parser.add_argument('--gpu_id', default=-1, type=int)
-    parser.add_argument('--threshold', default=0.5, type=float)
+    parser.add_argument('--threshold', default=0.05, type=float)
     parser.add_argument('--alpha', default=0.5, type=float)
 
     args = parser.parse_args()
