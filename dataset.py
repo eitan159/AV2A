@@ -6,6 +6,8 @@ import random
 from PIL import Image
 import os
 
+from utils.video_pp import suppress_output
+
 def remove_files_from_dir(dir_path):
     for filename in os.listdir(dir_path):
         file_path = os.path.join(dir_path, filename)
@@ -52,9 +54,14 @@ class AVE(Dataset):
             os.makedirs(self.audio_dir)
         remove_files_from_dir(self.audio_dir)
         
+        # for i, t in enumerate(range(0, int(audio.duration), 2)):
+        #     audio_chunk = audio.subclip(t_start=t, t_end=t + 2)
+        #     audio_chunk.write_audiofile(f"{self.audio_dir}/output_segment_{i}.wav")
+
         for i, t in enumerate(range(0, int(audio.duration), 2)):
             audio_chunk = audio.subclip(t_start=t, t_end=t + 2)
-            audio_chunk.write_audiofile(f"{self.audio_dir}/output_segment_{i}.wav")
+            suppressed_write_audiofile = suppress_output(audio_chunk.write_audiofile)
+            suppressed_write_audiofile(f"{self.audio_dir}/output_segment_{i}.wav")            
 
         frames = []
         fps = int(video.fps)
@@ -69,7 +76,7 @@ class AVE(Dataset):
 
         frames = torch.stack(frames)
 
-        return frames, self.audio_dir, self.video_annotation_dict[video_id]
+        return frames, self.audio_dir, self.video_annotation_dict[video_id], video_id
 
 
 # if __name__ == '__main__':

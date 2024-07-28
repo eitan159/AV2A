@@ -8,3 +8,4 @@ cache_dir/
 __pycache__
 .vscode/
 .wav
+*.sh

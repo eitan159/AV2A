@@ -1,6 +1,8 @@
 from PIL import Image
+from calc_metric import calc_metrics
 from models.imagebindmodel.imagebind.data import load_and_transform_text, load_and_transform_audio_data
 import torch
+from tqdm import tqdm
 from models.imagebindmodel.imagebind.models import imagebind_model
 from models.imagebindmodel.imagebind.models.imagebind_model import ModalityType
 from dataset import AVE
@@ -41,7 +43,7 @@ def predict(labels, frames, audio_files):
 
     unfiltered_video_events = optimize_video_events(image_events_dict)
     video_events = filter_events(unfiltered_video_events)
-    print(video_events)
+    return video_events
 
 
 def optimize_video_events(image_events_dict):
@@ -74,7 +76,6 @@ def optimize_video_events(image_events_dict):
 
 def filter_events(events_dict):
     filtered_events = {}
-    
     for key, intervals in events_dict.items():
         filtered_intervals = [interval for interval in intervals if len(interval) == 2 and interval[1] - interval[0] > 1]
         if filtered_intervals:
@@ -107,7 +108,13 @@ if __name__ == '__main__':
     model.eval()
     model.to(device)
 
-    for sample in dataset:
-        frames, audio_dir, label_dict = sample
+    candidates = {}
+    for sample in tqdm(dataset, desc="Processing samples"):
+        frames, audio_dir, label_dict, video_id = sample
+        video_id = video_id.replace('.mp4', '')
         audio_paths = [f"{dataset.audio_dir}/{file_name}" for file_name in os.listdir(dataset.audio_dir)]
-        predict(labels, frames, audio_paths)
+        video_events = predict(labels, frames, audio_paths)
+        candidates[video_id] = video_events
+    
+    calc_metrics(candidates, args.annotations_file_path)
+
