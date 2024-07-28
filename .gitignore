@@ -7,3 +7,4 @@ cache_dir/
 .checkpoints/
 __pycache__
 .vscode/
+.wav
