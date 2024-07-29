@@ -4,7 +4,7 @@ import json
 def load_gts(filename):
     gts = {}
     with open(filename, 'r') as file:
-        lines = file.readlines()[1:]  # Skip the header
+        lines = file.readlines()
         for line in lines:
             category, video_id, quality, start_time, end_time = line.strip().split('&')
             if video_id not in gts:
@@ -49,6 +49,20 @@ def compute_map(candidates, gts, thresholds):
         ap_values.append(ap)
     return ap_values
 
+
+def accuracy(candidates, gts):
+    counter = 0
+    hits = 0
+    for video_id in candidates:
+        for category, candidate_times in candidates[video_id].items():
+            for candidate_time in candidate_times:
+                for gt in gts[video_id]:
+                    counter += 1
+                    if gt[0] == category and iou(candidate_time, gt) == 1:
+                        hits += 1 
+                        break
+                    
+    return hits / counter
 
 def calc_metrics(annotation_file_path):
     with open('candidates.json', 'r') as f:
