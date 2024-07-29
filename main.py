@@ -1,4 +1,4 @@
-from PIL import Image
+import json
 from calc_metric import calc_metrics
 from models.imagebindmodel.imagebind.data import load_and_transform_text, load_and_transform_audio_data
 import torch
@@ -116,5 +116,7 @@ if __name__ == '__main__':
         video_events = predict(labels, frames, audio_paths)
         candidates[video_id] = video_events
     
-    calc_metrics(candidates, args.annotations_file_path)
+    with open('candidates.json', 'w') as f:
+        json.dump(candidates, f)
+    calc_metrics(args.annotations_file_path)
 
