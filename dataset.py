@@ -28,7 +28,7 @@ class AVE(Dataset):
             data = f.read().strip().split("\n")
         
         self.class2idx = {}
-        for annotation in data[1:]:
+        for annotation in data:
             # Category&VideoID&Quality&StartTime&EndTime - example line in the annotations file
             category, video_id, _, start, end = annotation.split("&") 
             if category not in self.class2idx:

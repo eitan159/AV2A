@@ -1,4 +1,5 @@
 import numpy as np
+import json
 
 def load_gts(filename):
     gts = {}
@@ -46,33 +47,29 @@ def compute_map(candidates, gts, thresholds):
         
         ap = compute_ap(tp, fp, fn)
         ap_values.append(ap)
-    return np.mean(ap_values)
+    return ap_values
 
 
-
-candidates = {
-    '-JJrKDsw16U': {
-        'Race car, auto racing': [[0, 9]],
-        'Truck': [[2, 8]]
-    },
-    '6YKWV3Hcsp8': {
-        'Toilet flush': [[0, 10]]
-    }
-}
-
-def calc_metrics(candidates, annotation_file_path):
-
+def calc_metrics(annotation_file_path):
+    with open('candidates.json', 'r') as f:
+        candidates = json.load(f)
+        
     gts = load_gts(annotation_file_path)
 
     # Filter candidates and gts to only include matching video IDs
     filtered_candidates = {k: v for k, v in candidates.items() if k in gts}
     filtered_gts = {k: v for k, v in gts.items() if k in candidates}
 
+    # thresholds_50_100 = np.linspace(0.5, 1.0, 6)
     thresholds_50_90 = np.arange(0.5, 1.0, 0.1)
     thresholds_10_90 = np.arange(0.1, 1.0, 0.1)
 
-    mAP_50_90 = compute_map(filtered_candidates, filtered_gts, thresholds_50_90)
-    average_mAP_10_90 = compute_map(filtered_candidates, filtered_gts, thresholds_10_90)
+    ap_values_50_90 = compute_map(filtered_candidates, filtered_gts, thresholds_50_90)
+    average_mAP_10_90 = np.mean(compute_map(filtered_candidates, filtered_gts, thresholds_10_90))
 
-    print(f"mAP at [0.5:0.1:0.9]: {mAP_50_90}")
+    for threshold, ap_value in zip(thresholds_50_90, ap_values_50_90):
+        print(f"AP at {threshold}: {ap_value}")
+
     print(f"Average mAP at [0.1:0.1:0.9]: {average_mAP_10_90}")
+
+# calc_metrics("/media/data2/shaulov/AVE_Dataset/testSet.txt")
