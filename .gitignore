@@ -11,3 +11,4 @@ __pycache__
 *.wav
 *.sh
 *.out
+*.txt

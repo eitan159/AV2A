@@ -1,5 +1,6 @@
 import numpy as np
 import json
+import argparse
 
 def load_gts(filename):
     gts = {}
@@ -50,22 +51,22 @@ def compute_map(candidates, gts, thresholds):
     return ap_values
 
 
-def accuracy(candidates, gts):
+def calc_accuracy(candidates, gts):
     counter = 0
     hits = 0
     for video_id in candidates:
         for category, candidate_times in candidates[video_id].items():
             for candidate_time in candidate_times:
                 for gt in gts[video_id]:
-                    counter += 1
                     if gt[0] == category and iou(candidate_time, gt) == 1:
                         hits += 1 
                         break
+            counter += max(len(gts[video_id]), len(candidate_times))
                     
     return hits / counter
 
-def calc_metrics(annotation_file_path):
-    with open('candidates.json', 'r') as f:
+def calc_metrics(annotation_file_path, candidates_file_path):
+    with open(candidates_file_path, 'r') as f:
         candidates = json.load(f)
         
     gts = load_gts(annotation_file_path)
@@ -73,6 +74,8 @@ def calc_metrics(annotation_file_path):
     # Filter candidates and gts to only include matching video IDs
     filtered_candidates = {k: v for k, v in candidates.items() if k in gts}
     filtered_gts = {k: v for k, v in gts.items() if k in candidates}
+
+    print(f"Accuracy: {calc_accuracy(filtered_candidates, filtered_gts)}")
 
     # thresholds_50_100 = np.linspace(0.5, 1.0, 6)
     thresholds_50_90 = np.arange(0.5, 1.0, 0.1)
@@ -86,4 +89,10 @@ def calc_metrics(annotation_file_path):
 
     print(f"Average mAP at [0.1:0.1:0.9]: {average_mAP_10_90}")
 
-# calc_metrics("/media/data2/shaulov/AVE_Dataset/testSet.txt")
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--annotations_file_path', required=True, type=str)
+    parser.add_argument('--candidates_file_path', required=True, type=str)
+    args = parser.parse_args()
+
+    calc_metrics(args.annotations_file_path, args.candidates_file_path)

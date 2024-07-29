@@ -91,7 +91,7 @@ if __name__ == '__main__':
     parser.add_argument('--gpu_id', default=-1, type=int)
     parser.add_argument('--threshold', default=0.05, type=float)
     parser.add_argument('--alpha', default=0.5, type=float)
-
+    parser.add_argument('--candidates_file_path', required=True, type=str)
     args = parser.parse_args()
 
     threshold = args.threshold
@@ -116,7 +116,7 @@ if __name__ == '__main__':
         video_events = predict(labels, frames, audio_paths)
         candidates[video_id] = video_events
     
-    with open('candidates.json', 'w') as f:
+    with open(args.candidates_file_path, 'w') as f:
         json.dump(candidates, f)
     calc_metrics(args.annotations_file_path)
 
