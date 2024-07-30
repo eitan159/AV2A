@@ -21,13 +21,17 @@ def predict(labels, frames, audio_files):
     with torch.no_grad():
         embeddings = model(modality_inputs)
     
+    embeddings[ModalityType.AUDIO] = embeddings[ModalityType.AUDIO].repeat_interleave(2, dim=0)
+
     video_text_similarity = embeddings[ModalityType.VISION] @ embeddings[ModalityType.TEXT].T   
-    audio_text_similarity = (embeddings[ModalityType.AUDIO] @ embeddings[ModalityType.TEXT].T).repeat_interleave(2, dim=0)
-    
+    audio_text_similarity = embeddings[ModalityType.AUDIO] @ embeddings[ModalityType.TEXT].T
+    vision_audio_similarity = embeddings[ModalityType.VISION] @ embeddings[ModalityType.AUDIO].T
+
     video_text_similarity = torch.softmax(video_text_similarity, dim=-1)
     audio_text_similarity = torch.softmax(audio_text_similarity, dim=-1)
+    alphas = torch.softmax(vision_audio_similarity, dim=-1).diagonal().unsqueeze(1)
 
-    similarities = alpha * video_text_similarity + (1 - alpha) * audio_text_similarity
+    similarities = (1 - alphas) * video_text_similarity + alphas * audio_text_similarity
     similarities = torch.softmax(similarities, dim=-1)
 
     # similarities = torch.softmax(similarities, dim=-1)
