@@ -8,33 +8,36 @@ from models.imagebindmodel.imagebind.models.imagebind_model import ModalityType
 from dataset import AVE
 import argparse
 import numpy as np
-from data_transforms import image_transforms_imagebind
+from data_transforms import image_transforms_imagebind, language_bind_transform
 import os
+from models.languagebindmodel.languagebind import LanguageBind, to_device, transform_dict, LanguageBindImageTokenizer
+
 
 def predict(labels, frames, audio_files):
 
     preprocessed_labels = [f"A {label.split(',')[0]}" for label in labels]
 
-    modality_inputs = {
-        ModalityType.TEXT: load_and_transform_text(preprocessed_labels, device),
-        ModalityType.VISION: frames.to(device),
-        ModalityType.AUDIO: load_and_transform_audio_data(audio_files, device),
+    inputs = {
+        'image': {"pixel_values": frames.to(device)},
+        'audio': to_device(modality_transform['audio'](audio_files), device),
     }
+    inputs['language'] = to_device(tokenizer(preprocessed_labels, max_length=77, padding='max_length',
+                                             truncation=True, return_tensors='pt'), device)
 
     with torch.no_grad():
-        embeddings = model(modality_inputs)
+        embeddings = model(inputs)
     
-    embeddings[ModalityType.AUDIO] = embeddings[ModalityType.AUDIO].repeat_interleave(2, dim=0)
+    embeddings['audio'] = embeddings['audio'].repeat_interleave(2, dim=0)
 
-    video_text_similarity = embeddings[ModalityType.VISION] @ embeddings[ModalityType.TEXT].T   
-    audio_text_similarity = embeddings[ModalityType.AUDIO] @ embeddings[ModalityType.TEXT].T
-    vision_audio_similarity = embeddings[ModalityType.VISION] @ embeddings[ModalityType.AUDIO].T
+    video_text_similarity = embeddings['image'] @ embeddings['language'].T   
+    audio_text_similarity = embeddings['audio'] @ embeddings['language'].T
+    # vision_audio_similarity = embeddings[ModalityType.VISION] @ embeddings[ModalityType.AUDIO].T
 
     video_text_similarity = torch.softmax(video_text_similarity, dim=-1)
     audio_text_similarity = torch.softmax(audio_text_similarity, dim=-1)
-    alphas = torch.softmax(vision_audio_similarity, dim=-1).diagonal().unsqueeze(1)
+    # alphas = torch.softmax(vision_audio_similarity, dim=-1).diagonal().unsqueeze(1)
 
-    similarities = (1 - alphas) * video_text_similarity + alphas * audio_text_similarity
+    similarities = alpha * video_text_similarity + (1 - alpha) * audio_text_similarity
     similarities = torch.softmax(similarities, dim=-1)
 
     # similarities = torch.softmax(similarities, dim=-1)
@@ -144,14 +147,25 @@ if __name__ == '__main__':
     
     dataset = AVE(args.video_dir_path,
                   args.annotations_file_path,
-                  frames_transforms=image_transforms_imagebind)
+                  frames_transforms=language_bind_transform)
     
     labels = list(dataset.class2idx.keys())
 
     device = f"cuda:{args.gpu_id}" if args.gpu_id != -1 else "cpu"
-    model = imagebind_model.imagebind_huge(pretrained=True)
+
+
+    clip_type = {
+        'audio': 'LanguageBind_Audio_FT',
+        'image': 'LanguageBind_Image',
+    }
+
+    model = LanguageBind(clip_type=clip_type, cache_dir='./cache_dir')
+    model = model.to(device)
     model.eval()
-    model.to(device)
+    pretrained_ckpt = f'lb203/LanguageBind_Image'
+    tokenizer = LanguageBindImageTokenizer.from_pretrained(pretrained_ckpt, cache_dir='./cache_dir/tokenizer_cache_dir')
+    modality_transform = {c: transform_dict[c](model.modality_config[c]) for c in clip_type.keys()}
+
 
     candidates = {}
     for sample in tqdm(dataset, desc="Processing samples"):
