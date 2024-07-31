@@ -95,5 +95,4 @@ if __name__ == '__main__':
     parser.add_argument('--candidates_file_path', required=True, type=str)
     args = parser.parse_args()
 
-    # calc_metrics(args.annotations_file_path, args.candidates_file_path)
-    calc_metrics("/media/data2/shaulov/AVE_Dataset/testSet.txt", "cand.json")
+    calc_metrics(args.annotations_file_path, args.candidates_file_path)

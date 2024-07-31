@@ -12,8 +12,11 @@ from data_transforms import image_transforms_imagebind
 import os
 
 def predict(labels, frames, audio_files):
+
+    preprocessed_labels = [f"A {label.split(',')[0]}" for label in labels]
+
     modality_inputs = {
-        ModalityType.TEXT: load_and_transform_text(labels, device),
+        ModalityType.TEXT: load_and_transform_text(preprocessed_labels, device),
         ModalityType.VISION: frames.to(device),
         ModalityType.AUDIO: load_and_transform_audio_data(audio_files, device),
     }
@@ -41,6 +44,7 @@ def predict(labels, frames, audio_files):
         tensor_slice_np = similarities[event_dim].cpu().numpy()
         indices = np.where(tensor_slice_np > threshold)[0]
         events = [labels[i] for i in indices]
+        # events = similarities[event_dim].argmax()
         # values = tensor_slice_np[indices]
         image_events_dict[f"frame-{event_dim}"] = events
 
