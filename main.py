@@ -46,6 +46,8 @@ def predict(labels, frames, audio_files):
 
 
     unfiltered_video_events = optimize_video_events(image_events_dict)
+    unfiltered_video_events = increment_end_times(unfiltered_video_events)
+    unfiltered_video_events = merge_consecutive_segments(unfiltered_video_events)
     video_events = filter_events(unfiltered_video_events)
     return video_events
 
@@ -77,6 +79,16 @@ def optimize_video_events(image_events_dict):
 
     return transformed_dict
 
+def increment_end_times(events):
+    updated_events = {}
+    for key, time_intervals in events.items():
+        updated_intervals = []
+        for interval in time_intervals:
+            if len(interval) == 2:
+                start, end = interval
+                updated_intervals.append([start, end + 1])
+        updated_events[key] = updated_intervals
+    return updated_events
 
 def filter_events(events_dict):
     filtered_events = {}
@@ -86,6 +98,31 @@ def filter_events(events_dict):
             filtered_events[key] = filtered_intervals
     
     return filtered_events
+
+
+def merge_consecutive_segments(events):
+    updated_events = {}
+    for key, time_intervals in events.items():
+        if not time_intervals:
+            updated_events[key] = []
+            continue
+
+        # Sort the intervals to ensure they are in order
+        sorted_intervals = sorted(time_intervals)
+        merged_intervals = [sorted_intervals[0]]
+
+        for current in sorted_intervals[1:]:
+            last = merged_intervals[-1]
+            if current[0] <= last[1] + 1:  # Check if intervals are consecutive or overlapping
+                last[1] = max(last[1], current[1])  # Merge intervals
+            else:
+                merged_intervals.append(current)  # Add new interval
+
+        updated_events[key] = merged_intervals
+
+    return updated_events
+
+
 
 if __name__ == '__main__':
 
@@ -122,5 +159,4 @@ if __name__ == '__main__':
     
     with open(args.candidates_file_path, 'w') as f:
         json.dump(candidates, f)
-    calc_metrics(args.annotations_file_path)
-
+    calc_metrics(args.annotations_file_path, args.candidates_file_path)
