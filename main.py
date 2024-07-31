@@ -1,6 +1,6 @@
 import json
 from calc_metric import calc_metrics
-from models.imagebindmodel.imagebind.data import load_and_transform_text, load_and_transform_audio_data
+from models.imagebindmodel.imagebind.data import load_and_transform_text, load_and_transform_audio_data, load_and_transform_vision_data
 import torch
 from tqdm import tqdm
 from models.imagebindmodel.imagebind.models import imagebind_model
@@ -10,10 +10,13 @@ import argparse
 import numpy as np
 from data_transforms import image_transforms_imagebind
 import os
+# from models.languagebindmodel.languagebind import LanguageBind, to_device, transform_dict, LanguageBindImageTokenizer
+from utils.video_pp import crop_video_and_extract_audio
 
-def predict(labels, frames, audio_files):
 
-    preprocessed_labels = [f"A {label.split(',')[0]}" for label in labels]
+def predict(labels, frames, audio_files, video_id):
+
+    preprocessed_labels = [f"A {label.split(',')[0].lower()}" for label in labels]
 
     modality_inputs = {
         ModalityType.TEXT: load_and_transform_text(preprocessed_labels, device),
@@ -53,6 +56,7 @@ def predict(labels, frames, audio_files):
     unfiltered_video_events = increment_end_times(unfiltered_video_events)
     unfiltered_video_events = merge_consecutive_segments(unfiltered_video_events)
     video_events = filter_events(unfiltered_video_events)
+    refine_segments(video_events, video_id, preprocessed_labels)
     return video_events
 
 
@@ -104,6 +108,37 @@ def filter_events(events_dict):
     return filtered_events
 
 
+def refine_segments(video_events, video_id, preprocessed_labels):
+    video_path = os.path.join(video_dir_path, video_id)
+    for event, time_ranges in video_events.items():
+        for start_time, end_time in time_ranges:
+            crop_video_and_extract_audio(video_path, start_time, end_time, output_video_path, output_audio_path)
+            segment_frames = frames[start_time:end_time]
+            modality_inputs = {
+                ModalityType.TEXT: load_and_transform_text(preprocessed_labels, device),
+                ModalityType.VISION: segment_frames.to(device),
+                ModalityType.AUDIO: load_and_transform_audio_data([output_audio_path], device),
+            }
+
+            with torch.no_grad():
+                embeddings = model(modality_inputs)
+            
+            embeddings[ModalityType.AUDIO] = embeddings[ModalityType.AUDIO].repeat_interleave(2, dim=0)
+
+            video_text_similarity = embeddings[ModalityType.VISION] @ embeddings[ModalityType.TEXT].T   
+            audio_text_similarity = embeddings[ModalityType.AUDIO] @ embeddings[ModalityType.TEXT].T
+            vision_audio_similarity = embeddings[ModalityType.VISION] @ embeddings[ModalityType.AUDIO].T
+
+            video_text_similarity = torch.softmax(video_text_similarity, dim=-1)
+            audio_text_similarity = torch.softmax(audio_text_similarity, dim=-1)
+            alphas = torch.softmax(vision_audio_similarity, dim=-1).diagonal().unsqueeze(1)
+
+            similarities = (1 - alphas) * video_text_similarity + alphas * audio_text_similarity
+            similarities = torch.softmax(similarities, dim=-1)
+
+            
+
+
 def merge_consecutive_segments(events):
     updated_events = {}
     for key, time_intervals in events.items():
@@ -133,14 +168,20 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--video_dir_path', required=True, type=str)
     parser.add_argument('--annotations_file_path', required=True, type=str)
+    parser.add_argument('--candidates_file_path', required=True, type=str)
     parser.add_argument('--gpu_id', default=-1, type=int)
     parser.add_argument('--threshold', default=0.05, type=float)
     parser.add_argument('--alpha', default=0.5, type=float)
-    parser.add_argument('--candidates_file_path', required=True, type=str)
+    parser.add_argument('--output_video_path', default="/home/shaulov/work/zeroshot_AVE/cropped_files/output_video_path.mp4", type=str)
+    parser.add_argument('--output_audio_path', default="/home/shaulov/work/zeroshot_AVE/cropped_files/cropped_audio.wav", type=str)
+
     args = parser.parse_args()
 
     threshold = args.threshold
     alpha = args.alpha
+    video_dir_path = args.video_dir_path
+    output_video_path = args.output_video_path
+    output_audio_path = args.output_audio_path
     
     dataset = AVE(args.video_dir_path,
                   args.annotations_file_path,
@@ -156,11 +197,12 @@ if __name__ == '__main__':
     candidates = {}
     for sample in tqdm(dataset, desc="Processing samples"):
         frames, audio_dir, label_dict, video_id = sample
-        video_id = video_id.replace('.mp4', '')
+        video_id_without_extemnsion = video_id.replace('.mp4', '')
         audio_paths = [f"{dataset.audio_dir}/{file_name}" for file_name in os.listdir(dataset.audio_dir)]
-        video_events = predict(labels, frames, audio_paths)
-        candidates[video_id] = video_events
+        video_events = predict(labels, frames, audio_paths, video_id)
+        candidates[video_id_without_extemnsion] = video_events
     
     with open(args.candidates_file_path, 'w') as f:
         json.dump(candidates, f)
     calc_metrics(args.annotations_file_path, args.candidates_file_path)
+
