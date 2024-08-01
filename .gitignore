@@ -5,6 +5,7 @@
 *.json
 *.vscode
 cache_dir/
+cropped_files/
 .checkpoints/
 __pycache__
 .vscode/
