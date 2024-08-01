@@ -285,4 +285,3 @@ if __name__ == '__main__':
     with open(args.candidates_file_path, 'w') as f:
         json.dump(candidates, f)
     calc_metrics(args.annotations_file_path, args.candidates_file_path)
-
