@@ -12,3 +12,5 @@ __pycache__
 *.sh
 *.out
 *.txt
+sample_audio_chunks/
+cropped_files/
