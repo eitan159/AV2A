@@ -13,7 +13,7 @@ from utils.video_pp import crop_video_and_extract_audio
 
 def predict(labels, frames, audio_files, video_id):
 
-    preprocessed_labels = [f"A {label.split(',')[0].lower()}" for label in labels]
+    preprocessed_labels = [f"A {label.split(',')[0]}" for label in labels]
 
     inputs = {
         'image': {"pixel_values": frames.to(device)},
@@ -106,37 +106,6 @@ def filter_events(events_dict):
     return filtered_events
 
 
-def refine_segments(video_events, video_id, preprocessed_labels):
-    video_path = os.path.join(video_dir_path, video_id)
-    for event, time_ranges in video_events.items():
-        for start_time, end_time in time_ranges:
-            crop_video_and_extract_audio(video_path, start_time, end_time, output_video_path, output_audio_path)
-            segment_frames = frames[start_time:end_time]
-            modality_inputs = {
-                ModalityType.TEXT: load_and_transform_text(preprocessed_labels, device),
-                ModalityType.VISION: segment_frames.to(device),
-                ModalityType.AUDIO: load_and_transform_audio_data([output_audio_path], device),
-            }
-
-            with torch.no_grad():
-                embeddings = model(modality_inputs)
-            
-            embeddings[ModalityType.AUDIO] = embeddings[ModalityType.AUDIO].repeat_interleave(2, dim=0)
-
-            video_text_similarity = embeddings[ModalityType.VISION] @ embeddings[ModalityType.TEXT].T   
-            audio_text_similarity = embeddings[ModalityType.AUDIO] @ embeddings[ModalityType.TEXT].T
-            vision_audio_similarity = embeddings[ModalityType.VISION] @ embeddings[ModalityType.AUDIO].T
-
-            video_text_similarity = torch.softmax(video_text_similarity, dim=-1)
-            audio_text_similarity = torch.softmax(audio_text_similarity, dim=-1)
-            alphas = torch.softmax(vision_audio_similarity, dim=-1).diagonal().unsqueeze(1)
-
-            similarities = (1 - alphas) * video_text_similarity + alphas * audio_text_similarity
-            similarities = torch.softmax(similarities, dim=-1)
-
-            
-
-
 def merge_consecutive_segments(events):
     updated_events = {}
     for key, time_intervals in events.items():
@@ -223,20 +192,12 @@ def refine_segments(video_events, video_id, preprocessed_labels):
         return refined_segments
 
 
-            
-
-
-
-
-            
-
 
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--video_dir_path', required=True, type=str)
     parser.add_argument('--annotations_file_path', required=True, type=str)
-    parser.add_argument('--candidates_file_path', required=True, type=str)
     parser.add_argument('--gpu_id', default=-1, type=int)
     parser.add_argument('--threshold', default=0.05, type=float)
     parser.add_argument('--alpha', default=0.5, type=float)
