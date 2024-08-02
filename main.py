@@ -8,7 +8,7 @@ import numpy as np
 from data_transforms import language_bind_transform
 import os
 from models.languagebindmodel.languagebind import LanguageBind, to_device, transform_dict, LanguageBindImageTokenizer
-from utils.video_pp import crop_video_and_extract_audio
+from utils.video_pp import crop_video_and_extract_audio, extract_audio, get_video_duration
 
 
 def predict(labels, frames, audio_files, video_id):
@@ -55,6 +55,8 @@ def predict(labels, frames, audio_files, video_id):
     unfiltered_video_events = merge_consecutive_segments(unfiltered_video_events)
     video_events = filter_events(unfiltered_video_events)
     refined_video_events = refine_segments(video_events, video_id, preprocessed_labels)
+    # refined_video_events = stage3(refined_video_events, video_id, preprocessed_labels)
+    
     return refined_video_events
 
 
@@ -130,7 +132,7 @@ def merge_consecutive_segments(events):
 
 
 def refine_segments(video_events, video_id, preprocessed_labels):
-    if len(video_events) == 1 and len(next(iter(video_events.values()))) == 1:
+    if (len(video_events) == 1 and len(next(iter(video_events.values()))) == 1) or (not video_events):
         return video_events
     else:
         refined_segments = {}
@@ -161,6 +163,7 @@ def refine_segments(video_events, video_id, preprocessed_labels):
                 similarities = (1 - alpha) * video_text_similarity + (alpha) * audio_text_similarity
                 similarities = torch.softmax(similarities, dim=-1)
                 max_value, max_index = torch.max(similarities, dim=1)
+                
                 if preprocessed_labels[max_index] == f"A {event.split(',')[0]}":
                     if event in refined_segments:
                         refined_segments[event].append((start_time, end_time))
@@ -184,13 +187,93 @@ def refine_segments(video_events, video_id, preprocessed_labels):
                             max_score = score.item()
                             max_event = event
                             max_times = times
-            try:
-                return {max_event: [list(max_times)]}
-            except:
-                return {}
+
+            return {max_event: [list(max_times)]}
 
         return refined_segments
+    
+def stage3(video_events, video_id, preprocessed_labels):
+    refined_segments = {}
+    video_path = os.path.join(video_dir_path, video_id)
+    video_length = round(get_video_duration(video_path))
+    for event, time_ranges in video_events.items():
+        for start_time, end_time in time_ranges:
+            refined_left_value = start_time
+            refined_right_value = end_time
+            extract_audio(video_path, output_audio_path)
+            og_similarities = get_similiraties(preprocessed_labels, video_path, output_audio_path)
+            og_max_value, _ = torch.max(og_similarities, dim=1)    
+                            
+            if start_time - 1 >= 0:
+                crop_video_and_extract_audio(video_path, start_time - 1, end_time, output_video_path, output_audio_path)
+                similarities = get_similiraties(preprocessed_labels, output_video_path, output_audio_path)
+                max_value, max_index = torch.max(similarities, dim=1)
+                    
+                if (max_value > og_max_value + 0.001) and (preprocessed_labels[max_index] == f"A {event.split(',')[0]}"):
+                    refined_left_value = start_time - 1
+                    og_max_value = max_value
+                
+            if start_time + 1 <= video_length:     
+                crop_video_and_extract_audio(video_path, start_time + 1, end_time, output_video_path, output_audio_path)
+                similarities = get_similiraties(preprocessed_labels, output_video_path, output_audio_path)
+                max_value, max_index = torch.max(similarities, dim=1)
+                    
+                if (max_value > og_max_value + 0.001) and (preprocessed_labels[max_index] == f"A {event.split(',')[0]}"):
+                    refined_left_value = start_time + 1                    
 
+
+
+            if end_time - 1 >= 0:
+                crop_video_and_extract_audio(video_path, start_time, end_time - 1, output_video_path, output_audio_path)
+                similarities = get_similiraties(preprocessed_labels, output_video_path, output_audio_path)
+                max_value, max_index = torch.max(similarities, dim=1)
+                    
+                if (max_value > og_max_value + 0.001) and (preprocessed_labels[max_index] == f"A {event.split(',')[0]}"):
+                    refined_right_value = end_time - 1
+                    og_max_value = max_value
+                
+            if end_time + 1 <= video_length:     
+                crop_video_and_extract_audio(video_path, start_time, end_time + 1, output_video_path, output_audio_path)
+                similarities = get_similiraties(preprocessed_labels, output_video_path, output_audio_path)
+                max_value, max_index = torch.max(similarities, dim=1)
+                    
+                if (max_value > og_max_value + 0.001) and (preprocessed_labels[max_index] == f"A {event.split(',')[0]}"):
+                    refined_right_value = end_time + 1   
+
+            if event in refined_segments:
+                refined_segments[event].append((refined_left_value, refined_right_value))
+            else:
+                refined_segments[event] = [(refined_left_value, refined_right_value)]
+                                        
+            # print(refined_left_value, refined_right_value)   
+            
+    return refined_segments                       
+
+
+
+                    
+def get_similiraties(preprocessed_labels, output_video_path, output_audio_path):
+    inputs = {
+        'video': to_device(modality_transform['video']([output_video_path]), device),
+        'audio': to_device(modality_transform['audio']([output_audio_path]), device),
+    }
+    inputs['language'] = to_device(tokenizer(preprocessed_labels, max_length=77, padding='max_length',
+                                                            truncation=True, return_tensors='pt'), device)
+
+    with torch.no_grad():
+        embeddings = model(inputs)
+                    
+
+    video_text_similarity = embeddings['video'] @ embeddings['language'].T   
+    audio_text_similarity = embeddings['audio'] @ embeddings['language'].T
+
+    video_text_similarity = torch.softmax(video_text_similarity, dim=-1)
+    audio_text_similarity = torch.softmax(audio_text_similarity, dim=-1)
+
+    similarities = (1 - alpha) * video_text_similarity + (alpha) * audio_text_similarity
+    similarities = torch.softmax(similarities, dim=-1)
+    return similarities
+                    
 
 
 if __name__ == '__main__':
