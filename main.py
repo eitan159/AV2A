@@ -50,14 +50,14 @@ def predict(labels, frames, audio_files, video_id):
         image_events_dict[f"frame-{event_dim}"] = events
 
 
-    unfiltered_video_events = optimize_video_events(image_events_dict)
-    unfiltered_video_events = increment_end_times(unfiltered_video_events)
-    unfiltered_video_events = merge_consecutive_segments(unfiltered_video_events)
-    video_events = filter_events(unfiltered_video_events)
-    refined_video_events = refine_segments(video_events, video_id, preprocessed_labels)
+    results = optimize_video_events(image_events_dict)
+    results = increment_end_times(results)
+    results = merge_consecutive_segments(results)
+    results = filter_events(results)
+    # refined_video_events = refine_segments(video_events, video_id, preprocessed_labels)
     # refined_video_events = stage3(refined_video_events, video_id, preprocessed_labels)
     
-    return refined_video_events
+    return results
 
 
 def optimize_video_events(image_events_dict):
@@ -285,8 +285,8 @@ if __name__ == '__main__':
     parser.add_argument('--threshold', default=0.05, type=float)
     parser.add_argument('--alpha', default=0.5, type=float)
     parser.add_argument('--candidates_file_path', required=True, type=str)
-    parser.add_argument('--output_video_path', default="./zeroshot_AVE/cropped_files/cropped_video.mp4", required=True, type=str)
-    parser.add_argument('--output_audio_path', default="./zeroshot_AVE/cropped_files/cropped_audio.wav", required=True, type=str)
+    parser.add_argument('--output_video_path', default="./cropped_files/cropped_video.mp4", type=str)
+    parser.add_argument('--output_audio_path', default="./cropped_files/cropped_audio.wav", type=str)
     args = parser.parse_args()
 
     threshold = args.threshold
