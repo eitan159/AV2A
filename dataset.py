@@ -15,9 +15,11 @@ def remove_files_from_dir(dir_path):
             os.remove(file_path)
 
 class AVE(Dataset):
-    def __init__(self, video_dir_path, annotations_file_path, frames_transforms=None) -> None:
+    def __init__(self, video_dir_path, annotations_file_path, frames_transforms=None, 
+                 sample_audio_sec=2) -> None:
         self.video_dir_path = video_dir_path
         self.frames_transforms = frames_transforms
+        self.sample_audio_sec = sample_audio_sec
         self.audio_dir = "sample_audio_chunks"
         self.videos_ids = [video_id for video_id in os.listdir(video_dir_path) 
                            if os.path.splitext(os.path.join(self.video_dir_path, video_id))[1] == '.mp4']
@@ -56,8 +58,8 @@ class AVE(Dataset):
             os.makedirs(self.audio_dir)
         remove_files_from_dir(self.audio_dir)
 
-        for i, t in enumerate(range(0, int(audio.duration), 2)):
-            audio_chunk = audio.subclip(t_start=t, t_end=t + 2)
+        for i, t in enumerate(range(0, int(audio.duration), self.sample_audio_sec)):
+            audio_chunk = audio.subclip(t_start=t, t_end=t + self.sample_audio_sec)
             suppressed_write_audiofile = suppress_output(audio_chunk.write_audiofile)
             suppressed_write_audiofile(f"{self.audio_dir}/output_segment_{i}.wav")            
 

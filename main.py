@@ -285,6 +285,7 @@ if __name__ == '__main__':
     parser.add_argument('--threshold', default=0.05, type=float)
     parser.add_argument('--alpha', default=0.5, type=float)
     parser.add_argument('--candidates_file_path', required=True, type=str)
+    parser.add_argument('--sample_audio_sec', default=2, type=int)
     parser.add_argument('--output_video_path', default="./cropped_files/cropped_video.mp4", type=str)
     parser.add_argument('--output_audio_path', default="./cropped_files/cropped_audio.wav", type=str)
     args = parser.parse_args()
@@ -297,7 +298,8 @@ if __name__ == '__main__':
     
     dataset = AVE(args.video_dir_path,
                   args.annotations_file_path,
-                  frames_transforms=language_bind_transform)
+                  frames_transforms=language_bind_transform,
+                  sample_audio_sec=args.sample_audio_sec)
     
     labels = list(dataset.class2idx.keys())
 
