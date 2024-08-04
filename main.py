@@ -25,7 +25,7 @@ def predict(labels, frames, audio_files, video_id):
     with torch.no_grad():
         embeddings = model(inputs)
     
-    embeddings['audio'] = embeddings['audio'].repeat_interleave(2, dim=0)
+    embeddings['audio'] = embeddings['audio'].repeat_interleave(args.sample_audio_sec, dim=0)
 
     video_text_similarity = embeddings['image'] @ embeddings['language'].T   
     audio_text_similarity = embeddings['audio'] @ embeddings['language'].T
