@@ -54,7 +54,7 @@ def predict(labels, frames, audio_files, video_id):
     results = increment_end_times(results)
     results = merge_consecutive_segments(results)
     results = filter_events(results)
-    # refined_video_events = refine_segments(video_events, video_id, preprocessed_labels)
+    results = refine_segments(results, video_id, preprocessed_labels)
     # refined_video_events = stage3(refined_video_events, video_id, preprocessed_labels)
     
     return results
