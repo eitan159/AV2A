@@ -13,7 +13,7 @@ from utils.video_pp import crop_video_and_extract_audio, extract_audio, get_vide
 
 def predict(labels, frames, audio_files, video_id):
 
-    preprocessed_labels = [f"A {label.split(',')[0]}" for label in labels]
+    preprocessed_labels = [f"A {label.split(',')[0].lower()}" for label in labels]
 
     inputs = {
         'image': {"pixel_values": frames.to(device)},
@@ -164,7 +164,7 @@ def refine_segments(video_events, video_id, preprocessed_labels):
                 similarities = torch.softmax(similarities, dim=-1)
                 max_value, max_index = torch.max(similarities, dim=1)
                 
-                if preprocessed_labels[max_index] == f"A {event.split(',')[0]}":
+                if preprocessed_labels[max_index] == f"A {event.split(',')[0].lower()}":
                     if event in refined_segments:
                         refined_segments[event].append((start_time, end_time))
                     else:
