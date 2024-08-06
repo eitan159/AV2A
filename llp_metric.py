@@ -1,45 +1,59 @@
+import argparse
 import json
-import pandas as pd
+import sed_eval
+import dcase_util
 
-def load_candidates(file_path):
-    with open(file_path, 'r') as f:
-        candidates = json.load(f)
-    return candidates
+def calc_metrics(predictions_json_file_path, gt_json_file_path):
+    with open(predictions_json_file_path, 'r') as f:
+        pred = json.load(f)
+    with open(gt_json_file_path, 'r') as f:
+        gt = json.load(f)
+    
+    reference_event_list = dcase_util.containers.MetaDataContainer(gt)
+    estimated_event_list = dcase_util.containers.MetaDataContainer(pred)
 
-def load_ground_truth(file_path):
-    gts = pd.read_csv(file_path, delimiter='\t')
-    return gts
+    segment_based_metrics = sed_eval.sound_event.SegmentBasedMetrics(
+        event_label_list=reference_event_list.unique_event_labels,
+        time_resolution=1.0
+    )
+    event_based_metrics = sed_eval.sound_event.EventBasedMetrics(
+        event_label_list=reference_event_list.unique_event_labels,
+        t_collar=0.250
+    )
 
-def calculate_accuracy(candidates, gts):
-    correct_count = 0
-    total_count = 0
+    for filename in reference_event_list.unique_files:
+        reference_event_list_for_current_file = reference_event_list.filter(
+            filename=filename
+        )
 
-    for video_id, events in candidates.items():
-        # Filter the ground truth data for the current video_id
-        video_gts = gts[gts['filename'] == video_id]
+        estimated_event_list_for_current_file = estimated_event_list.filter(
+            filename=filename
+        )
 
-        # Check each event in the candidate file
-        for event, segments in events.items():
-            # Filter ground truth segments for the current event
-            gt_segments = video_gts[video_gts['event_labels'] == event]
+        segment_based_metrics.evaluate(
+            reference_event_list=reference_event_list_for_current_file,
+            estimated_event_list=estimated_event_list_for_current_file
+        )
 
-            for candidate_segment in segments:
-                # Check if the candidate segment is in the ground truth
-                if any((gt_segments['onset'] == candidate_segment[0]) & (gt_segments['offset'] == candidate_segment[1])):
-                    correct_count += 1
+        event_based_metrics.evaluate(
+            reference_event_list=reference_event_list_for_current_file,
+            estimated_event_list=estimated_event_list_for_current_file
+        )
 
-            total_count += len(segments)
+    # Get only certain metrics
+    overall_segment_based_metrics = segment_based_metrics.results_overall_metrics()
+    print("Accuracy:", overall_segment_based_metrics['accuracy']['accuracy'])
 
-    accuracy = correct_count / total_count if total_count > 0 else 0
-    return accuracy
+    # Or print all metrics as reports
+    print(segment_based_metrics)
+    print(event_based_metrics)
+    
 
 
-def calc_metric(gts_file, candidates_file):
-    candidates = load_candidates(candidates_file)
-    gts = load_ground_truth(gts_file)
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--predictions_json_file_path', required=True, type=str)
+    parser.add_argument('--gt_json_file_path', required=True, type=str)
+    args = parser.parse_args()
 
-    # Calculate accuracy
-    accuracy = calculate_accuracy(candidates, gts)
-    print(f'Accuracy: {accuracy * 100:.2f}%')
-
-calc_metric("/home/shaulov/work/zeroshot_AVE/intersection_results.csv", "cand.json")
+    calc_metrics(args.predictions_json_file_path, args.gt_json_file_path)

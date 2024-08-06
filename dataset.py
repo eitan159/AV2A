@@ -36,10 +36,10 @@ class AVE(Dataset):
             if category not in self.class2idx:
                 self.class2idx[category] = len(self.class2idx)
 
-            self.video_annotation_dict[f"{video_id}.mp4"] = {'class_name': category,
+            self.video_annotation_dict[f"{video_id}.mp4"] = [{'class_name': category,
                                                     'class_idx': self.class2idx[category],
                                                     'start': int(start),
-                                                    'end': int(end)}
+                                                    'end': int(end)}]
         
         self.videos_ids = [video_id for video_id in self.videos_ids if video_id in self.video_annotation_dict]
         

@@ -7,10 +7,45 @@ import argparse
 import numpy as np
 from data_transforms import language_bind_transform
 import os
-from llp_metric import calc_metric
+from llp_metric import calc_metrics
 from models.languagebindmodel.languagebind import LanguageBind, to_device, transform_dict, LanguageBindImageTokenizer
 from utils.video_pp import crop_video_and_extract_audio, extract_audio, get_video_duration
 
+def convert_results(results, video_id):
+    """
+    {
+            'event_label': 'car',
+            'event_onset': 0.0,
+            'event_offset': 2.5,
+            'file': 'audio/street/b099.wav',
+            'scene_label': 'street'
+    }
+    """
+    coverted_results = []
+    for event_label, event_segments in results.items():
+        for segment in event_segments:
+            coverted_results.append({
+                'event_label': event_label.lower(),
+                'event_onset': float(segment[0]),
+                'event_offset': float(segment[1]),
+                'file': video_id,
+                'scene_label': video_id
+            })
+
+    return coverted_results
+
+def convert_gt(gt, video_id):
+    coverted_results = []
+    for label_dict in gt:
+        coverted_results.append({
+            'event_label': label_dict['class_name'].lower(),
+            'event_onset': float(label_dict['start']),
+            'event_offset': float(label_dict['end']),
+            'file': video_id,
+            'scene_label': video_id
+        })
+
+    return coverted_results
 
 def predict(labels, frames, audio_files, video_id):
 
@@ -58,7 +93,7 @@ def predict(labels, frames, audio_files, video_id):
     results = refine_segments(results, video_id, preprocessed_labels)
     # refined_video_events = stage3(refined_video_events, video_id, preprocessed_labels)
     
-    return results
+    return convert_results(results, video_id)
 
 
 def optimize_video_events(image_events_dict):
@@ -328,17 +363,22 @@ if __name__ == '__main__':
     tokenizer = LanguageBindImageTokenizer.from_pretrained(pretrained_ckpt, cache_dir='./cache_dir/tokenizer_cache_dir')
     modality_transform = {c: transform_dict[c](model.modality_config[c]) for c in clip_type.keys()}
 
-    candidates = {}
+    candidates = []
+    gt_candidates = []
     for sample in tqdm(dataset, desc="Processing samples"):
         frames, audio_dir, label_dict, video_id = sample
         video_id_withot_extention = video_id.replace('.mp4', '')
         audio_paths = [f"{dataset.audio_dir}/{file_name}" for file_name in os.listdir(dataset.audio_dir)]
         filtered_labels = filter_classes(labels, video_id)
         video_events = predict(filtered_labels, frames, audio_paths, video_id)
-        candidates[video_id_withot_extention] = video_events
+        candidates.extend(video_events)
+        gt_candidates.extend(convert_gt(label_dict, video_id))
     
     with open(args.candidates_file_path, 'w') as f:
         json.dump(candidates, f)
+    
+    with open("GT.json", 'w') as f:
+        json.dump(gt_candidates, f)
 
-    calc_metric(args.annotations_file_path, args.candidates_file_path)
+    calc_metrics(args.candidates_file_path, "GT.json")
 
