@@ -1,5 +1,5 @@
 import json
-from calc_metric import calc_metrics
+from LLP_dataset import LLP
 import torch
 from tqdm import tqdm
 from dataset import AVE
@@ -7,6 +7,7 @@ import argparse
 import numpy as np
 from data_transforms import language_bind_transform
 import os
+from llp_metric import calc_metric
 from models.languagebindmodel.languagebind import LanguageBind, to_device, transform_dict, LanguageBindImageTokenizer
 from utils.video_pp import crop_video_and_extract_audio, extract_audio, get_video_duration
 
@@ -33,6 +34,9 @@ def predict(labels, frames, audio_files, video_id):
     video_text_similarity = torch.softmax(video_text_similarity, dim=-1)
     audio_text_similarity = torch.softmax(audio_text_similarity, dim=-1)
 
+    if video_text_similarity.shape[0] != audio_text_similarity.shape[0]:
+        last_frame = video_text_similarity[-1].unsqueeze(0)
+        video_text_similarity = torch.cat((video_text_similarity, last_frame), dim=0)
     similarities = alpha * video_text_similarity + (1 - alpha) * audio_text_similarity
     similarities = torch.softmax(similarities, dim=-1)
 
@@ -301,7 +305,7 @@ if __name__ == '__main__':
     output_video_path = args.output_video_path
     output_audio_path = args.output_audio_path
     
-    dataset = AVE(args.video_dir_path,
+    dataset = LLP(args.video_dir_path,
                   args.annotations_file_path,
                   frames_transforms=language_bind_transform,
                   sample_audio_sec=args.sample_audio_sec)
@@ -324,7 +328,6 @@ if __name__ == '__main__':
     tokenizer = LanguageBindImageTokenizer.from_pretrained(pretrained_ckpt, cache_dir='./cache_dir/tokenizer_cache_dir')
     modality_transform = {c: transform_dict[c](model.modality_config[c]) for c in clip_type.keys()}
 
-
     candidates = {}
     for sample in tqdm(dataset, desc="Processing samples"):
         frames, audio_dir, label_dict, video_id = sample
@@ -336,4 +339,6 @@ if __name__ == '__main__':
     
     with open(args.candidates_file_path, 'w') as f:
         json.dump(candidates, f)
-    calc_metrics(args.annotations_file_path, args.candidates_file_path)
+
+    calc_metric(args.annotations_file_path, args.candidates_file_path)
+

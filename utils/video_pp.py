@@ -12,7 +12,11 @@ def suppress_output(func):
 @suppress_output
 def crop_video_and_extract_audio(video_path, start_time, end_time, output_video_path, output_audio_path):
     video = VideoFileClip(video_path)
-    cropped_video = video.subclip(start_time, end_time)
+    video_length = get_video_duration(video_path)
+    if video_length >= end_time:
+        cropped_video = video.subclip(start_time, end_time)
+    else:
+        cropped_video = video.subclip(start_time, video_length)
     cropped_video.write_videofile(output_video_path, codec='libx264')
     audio = cropped_video.audio
     audio.write_audiofile(output_audio_path, codec='pcm_s16le')
