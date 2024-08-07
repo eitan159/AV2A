@@ -7,7 +7,6 @@ import argparse
 import numpy as np
 from data_transforms import language_bind_transform
 import os
-from llp_metric import calc_metrics
 from models.languagebindmodel.languagebind import LanguageBind, to_device, transform_dict, LanguageBindImageTokenizer
 from utils.video_pp import crop_video_and_extract_audio, extract_audio, get_video_duration
 
@@ -49,7 +48,7 @@ def convert_gt(gt, video_id):
 
 def predict(labels, frames, audio_files, video_id):
 
-    preprocessed_labels = [f"A {label.split(',')[0].lower()}" for label in labels]
+    preprocessed_labels = [f"A {label.replace('_', ' ').lower()}" for label in labels]
 
     inputs = {
         'image': {"pixel_values": frames.to(device)},
@@ -380,5 +379,4 @@ if __name__ == '__main__':
     with open("GT.json", 'w') as f:
         json.dump(gt_candidates, f)
 
-    calc_metrics(args.candidates_file_path, "GT.json")
 

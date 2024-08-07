@@ -28,13 +28,13 @@ class LLP(Dataset):
 
         self.video_annotation_dict = {}
         self.class2idx = {}
-        df = pd.read_csv(annotations_file_path, delimiter='\t')
+        df = pd.read_csv(annotations_file_path, delimiter=',')
         for index, row in df.iterrows():
             # Category&VideoID&Quality&StartTime&EndTime - example line in the annotations file
             # category, video_id, _, start, end = row.split("&") 
             video_id = row['filename']
             start = row['onset']
-            end = row['offset']
+            end = row['offset_event']
             category = row['event_labels']
             
             if category not in self.class2idx:
@@ -49,8 +49,7 @@ class LLP(Dataset):
                 'start': int(start),
                 'end': int(end)
             })
-            
-        print(self.videos_ids - self.video_annotation_dict.keys())            
+                             
         self.videos_ids = [video_id for video_id in self.videos_ids if video_id in self.video_annotation_dict]
 
         
