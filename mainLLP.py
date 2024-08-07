@@ -301,6 +301,6 @@ if __name__ == '__main__':
     
     with open(args.candidates_file_path, 'w') as f:
         json.dump({
-            "combined": combined_results,
-            "video": video_results,
-            "audio": audio_results}, f)
+            "combined": combined_candidates,
+            "video": video_candidates,
+            "audio": video_candidates}, f)
