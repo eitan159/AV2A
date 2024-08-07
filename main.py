@@ -2,7 +2,7 @@ import json
 from calc_metric import calc_metrics
 import torch
 from tqdm import tqdm
-from dataset import AVE
+from datasets import AVE
 import argparse
 import numpy as np
 from data_transforms import language_bind_transform

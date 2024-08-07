@@ -1,6 +1,7 @@
 import numpy as np
 import argparse
 import json
+import pandas as pd
 
 
 def Precision(X_pre, X_gt):
@@ -287,7 +288,9 @@ def event_wise_metric(event_p, event_gt):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--predictions_json_file_path', required=True, type=str)
-    parser.add_argument('--gt_json_file_path', required=True, type=str)
+    parser.add_argument('--test_csv_file_path', required=True, type=str)
+    parser.add_argument('--audio_csv_file_path', required=True, type=str)
+    parser.add_argument('--video_csv_file_path', required=True, type=str)
     args = parser.parse_args()
 
     categories = ['Speech', 'Car', 'Cheering', 'Dog', 'Cat', 'Frying_(food)',
@@ -301,30 +304,10 @@ if __name__ == '__main__':
 
     with open(args.predictions_json_file_path, 'r') as f:
         pred = json.load(f)
-    with open(args.gt_json_file_path, 'r') as f:
-        gt = json.load(f)
-
-    gt_labels = {}
-    for label_dict in gt:
-        if f"{label_dict['file']}" not in gt_labels:
-            gt_labels[f"{label_dict['file']}"] = []
-
-        gt_labels[f"{label_dict['file']}"].append({
-                'class_idx': id_to_idx[label_dict["event_label"]],
-                'start': int(label_dict["event_onset"]),
-                'end': int(label_dict["event_offset"])
-            })
-        
-    pred_labels = {}
-    for label_dict in pred:
-        if f"{label_dict['file']}" not in pred_labels:
-            pred_labels[f"{label_dict['file']}"] = []
-
-        pred_labels[f"{label_dict['file']}"].append({
-                'class_idx': id_to_idx[label_dict["event_label"]],
-                'start': int(label_dict["event_onset"]),
-                'end': int(label_dict["event_offset"])
-            })
+    
+    df = pd.read_csv(args.test_csv_file_path, header=0, sep='\t')
+    df_a = pd.read_csv(args.audio_csv_file_path, header=0, sep='\t')
+    df_v = pd.read_csv(args.video_csv_file_path, header=0, sep='\t')
     
     F_seg_a = []
     F_seg_v = []
@@ -334,21 +317,63 @@ if __name__ == '__main__':
     F_event_v = []
     F_event = []
     F_event_av = []
-    for video_id in gt_labels:
+    for file_name in df["filename"].values:
+        parts = file_name.split('_')
+        # Join all parts except the last two
+        file_name = '_'.join(parts[:-2])
+
         SO_a = np.zeros((25, 10))
         SO_v = np.zeros((25, 10))
         SO_av = np.zeros((25, 10))
         GT_a = np.zeros((25, 10))
         GT_v = np.zeros((25, 10))
         GT_av = np.zeros((25, 10))
-        if video_id in pred_labels:
-            for pred_dict in pred_labels[video_id]:
-                idx, x1, x2 = pred_dict["class_idx"], pred_dict["start"], pred_dict["end"]
+
+        df_vid_a = df_a.loc[df_a['filename'] == file_name]
+        filenames = df_vid_a["filename"]
+        events = df_vid_a["event_labels"]
+        onsets = df_vid_a["onset"]
+        offsets = df_vid_a["offset"]
+        num = len(filenames)
+        if num > 0:
+            for i in range(num):
+                x1 = int(onsets[df_vid_a.index[i]])
+                x2 = int(offsets[df_vid_a.index[i]])
+                event = events[df_vid_a.index[i]]
+                idx = id_to_idx[event]
+                GT_a[idx, x1:x2] = 1
+        
+
+        df_vid_v = df_v.loc[df_v['filename'] == file_name]
+        filenames = df_vid_v["filename"]
+        events = df_vid_v["event_labels"]
+        onsets = df_vid_v["onset"]
+        offsets = df_vid_v["offset"]
+        num = len(filenames)
+        if num > 0:
+            for i in range(num):
+                x1 = int(onsets[df_vid_v.index[i]])
+                x2 = int(offsets[df_vid_v.index[i]])
+                event = events[df_vid_v.index[i]]
+                idx = id_to_idx[event]
+                GT_v[idx, x1:x2] = 1
+        
+        GT_av = GT_a * GT_v
+
+        if file_name in pred["combined"]:
+            for pred_dict in pred[file_name]:
+                idx, x1, x2 = id_to_idx[pred_dict["class_idx"]], pred_dict["start"], pred_dict["end"]
                 SO_av[idx, x1:x2] = 1
 
-        for gt_dict in gt_labels[video_id]:
-            idx, x1, x2 = gt_dict["class_idx"], gt_dict["start"], gt_dict["end"]
-            GT_av[idx, x1:x2] = 1
+        if file_name in pred["video"]:
+            for pred_dict in pred[file_name]:
+                idx, x1, x2 = id_to_idx[pred_dict["class_idx"]], pred_dict["start"], pred_dict["end"]
+                SO_v[idx, x1:x2] = 1
+        
+        if file_name in pred["audio"]:
+            for pred_dict in pred[file_name]:
+                idx, x1, x2 = id_to_idx[pred_dict["class_idx"]], pred_dict["start"], pred_dict["end"]
+                SO_a[idx, x1:x2] = 1
 
         # segment-level F1 scores
         f_a, f_v, f, f_av = segment_level(SO_a, SO_v, SO_av, GT_a, GT_v, GT_av)
@@ -364,9 +389,24 @@ if __name__ == '__main__':
         F_event.append(f)
         F_event_av.append(f_av)
         
+    print('Audio Event Detection Segment-level F1: {:.1f}'.format(100 * np.mean(np.array(F_seg_a))))
+    print('Visual Event Detection Segment-level F1: {:.1f}'.format(100 * np.mean(np.array(F_seg_v))))
     print('Audio-Visual Event Detection Segment-level F1: {:.1f}'.format(100 * np.mean(np.array(F_seg_av))))
+
+    avg_type = (100 * np.mean(np.array(F_seg_av))+100 * np.mean(np.array(F_seg_a))+100 * np.mean(np.array(F_seg_v)))/3.
+    avg_event = 100 * np.mean(np.array(F_seg))
+    print('Segment-levelType@Avg. F1: {:.1f}'.format(avg_type))
+    print('Segment-level Event@Avg. F1: {:.1f}'.format(avg_event))
+
+    print('Audio Event Detection Event-level F1: {:.1f}'.format(100 * np.mean(np.array(F_event_a))))
+    print('Visual Event Detection Event-level F1: {:.1f}'.format(100 * np.mean(np.array(F_event_v))))
     print('Audio-Visual Event Detection Event-level F1: {:.1f}'.format(100 * np.mean(np.array(F_event_av))))
-        
+
+    avg_type_event = (100 * np.mean(np.array(F_event_av)) + 100 * np.mean(np.array(F_event_a)) + 100 * np.mean(
+        np.array(F_event_v))) / 3.
+    avg_event_level = 100 * np.mean(np.array(F_event))
+    print('Event-level Type@Avg. F1: {:.1f}'.format(avg_type_event))
+    print('Event-level Event@Avg. F1: {:.1f}'.format(avg_event_level))
             
 
 

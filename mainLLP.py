@@ -1,8 +1,7 @@
 import json
-from LLP_dataset import LLP
+from datasets import LLP
 import torch
 from tqdm import tqdm
-from dataset import AVE
 import argparse
 import numpy as np
 from data_transforms import language_bind_transform
@@ -11,77 +10,23 @@ from models.languagebindmodel.languagebind import LanguageBind, to_device, trans
 from utils.video_pp import crop_video_and_extract_audio, extract_audio, get_video_duration
 
 def convert_results(results, video_id):
-    """
-    {
-            'event_label': 'car',
-            'event_onset': 0.0,
-            'event_offset': 2.5,
-            'file': 'audio/street/b099.wav',
-            'scene_label': 'street'
-    }
-    """
     coverted_results = []
     for event_label, event_segments in results.items():
         for segment in event_segments:
             coverted_results.append({
                 'event_label': event_label.lower(),
-                'event_onset': float(segment[0]),
-                'event_offset': float(segment[1]),
-                'file': video_id,
-                'scene_label': video_id
+                'start': segment[0],
+                'end': segment[1],
             })
 
-    return coverted_results
+    return {video_id.replace('.mp4', ''): coverted_results}
 
-def convert_gt(gt, video_id):
-    coverted_results = []
-    for label_dict in gt:
-        coverted_results.append({
-            'event_label': label_dict['class_name'].lower(),
-            'event_onset': float(label_dict['start']),
-            'event_offset': float(label_dict['end']),
-            'file': video_id,
-            'scene_label': video_id
-        })
-
-    return coverted_results
-
-def predict(labels, frames, audio_files, video_id):
-
-    preprocessed_labels = [f"A {label.replace('_', ' ').lower()}" for label in labels]
-
-    inputs = {
-        'image': {"pixel_values": frames.to(device)},
-        'audio': to_device(modality_transform['audio'](audio_files), device),
-    }
-    inputs['language'] = to_device(tokenizer(preprocessed_labels, max_length=77, padding='max_length',
-                                             truncation=True, return_tensors='pt'), device)
-
-    with torch.no_grad():
-        embeddings = model(inputs)
-    
-    embeddings['audio'] = embeddings['audio'].repeat_interleave(args.sample_audio_sec, dim=0)
-
-    video_text_similarity = embeddings['image'] @ embeddings['language'].T   
-    audio_text_similarity = embeddings['audio'] @ embeddings['language'].T
-
-    video_text_similarity = torch.softmax(video_text_similarity, dim=-1)
-    audio_text_similarity = torch.softmax(audio_text_similarity, dim=-1)
-
-    if video_text_similarity.shape[0] != audio_text_similarity.shape[0]:
-        last_frame = video_text_similarity[-1].unsqueeze(0)
-        video_text_similarity = torch.cat((video_text_similarity, last_frame), dim=0)
-    similarities = alpha * video_text_similarity + (1 - alpha) * audio_text_similarity
-    similarities = torch.softmax(similarities, dim=-1)
-
-
+def optimize(similarities, labels, similarity_type):
     image_events_dict = {}
     for event_dim in range(similarities.shape[0]):
         tensor_slice_np = similarities[event_dim].cpu().numpy()
-        indices = np.where(tensor_slice_np > threshold)[0]
+        indices = np.where(tensor_slice_np > threshold_stage1)[0]
         events = [labels[i] for i in indices]
-        # events = similarities[event_dim].argmax()
-        # values = tensor_slice_np[indices]
         image_events_dict[f"frame-{event_dim}"] = events
 
 
@@ -89,11 +34,27 @@ def predict(labels, frames, audio_files, video_id):
     results = increment_end_times(results)
     results = merge_consecutive_segments(results)
     results = filter_events(results)
-    results = refine_segments(results, video_id, preprocessed_labels)
-    # refined_video_events = stage3(refined_video_events, video_id, preprocessed_labels)
+    results = refine_segments(results, video_id, labels, similarity_type)
     
     return convert_results(results, video_id)
 
+def predict(labels, frames, audio_files, video_id):
+    combined_filtered_labels, video_filtered_labels, audio_filtered_labels = filter_classes(labels, video_id, filter_threshold)
+    
+    inputs = {
+        'image': {"pixel_values": frames.to(device)},
+        'audio': to_device(modality_transform['audio'](audio_files), device),
+    }
+    combined_similarities, _, _ = get_similiraties(combined_filtered_labels, inputs, alpha)
+    _, video_text_similarties, _ = get_similiraties(video_filtered_labels, inputs, alpha)
+    _, _, audio_text_similarites = get_similiraties(audio_filtered_labels, inputs, alpha)
+
+
+    combined_results = optimize(combined_similarities, combined_filtered_labels, "combined")
+    video_results = optimize(video_text_similarties, video_filtered_labels, "video")
+    audio_results = optimize(audio_text_similarites, audio_filtered_labels, "audio")
+
+    return combined_results, video_results, audio_results
 
 def optimize_video_events(image_events_dict):
     transformed_dict = {}
@@ -142,7 +103,6 @@ def filter_events(events_dict):
     
     return filtered_events
 
-
 def merge_consecutive_segments(events):
     updated_events = {}
     for key, time_intervals in events.items():
@@ -165,8 +125,7 @@ def merge_consecutive_segments(events):
 
     return updated_events
 
-
-def refine_segments(video_events, video_id, preprocessed_labels):
+def refine_segments(video_events, video_id, labels, similarity_type):
     if (len(video_events) == 1 and len(next(iter(video_events.values()))) == 1) or (not video_events):
         return video_events
     else:
@@ -181,25 +140,18 @@ def refine_segments(video_events, video_id, preprocessed_labels):
                     'video': to_device(modality_transform['video']([output_video_path]), device),
                     'audio': to_device(modality_transform['audio']([output_audio_path]), device),
                 }
-                inputs['language'] = to_device(tokenizer(preprocessed_labels, max_length=77, padding='max_length',
-                                                        truncation=True, return_tensors='pt'), device)
-
-                with torch.no_grad():
-                    embeddings = model(inputs)
+                combined_similarities, video_text_similarties, audio_text_similarties = get_similiraties(labels, inputs, alpha)
                 
-                # embeddings['audio'] = embeddings['audio'].repeat_interleave(2, dim=0)
+                # TODO use threshold_stage 2 here !!!
+                if similarity_type == "combined":
+                    max_value, max_index = torch.max(combined_similarities, dim=1)
+                elif similarity_type == "video":
+                    max_value, max_index = torch.max(video_text_similarties, dim=1)
+                else:
+                    max_value, max_index = torch.max(audio_text_similarties, dim=1)
 
-                video_text_similarity = embeddings['video'] @ embeddings['language'].T   
-                audio_text_similarity = embeddings['audio'] @ embeddings['language'].T
 
-                video_text_similarity = torch.softmax(video_text_similarity, dim=-1)
-                audio_text_similarity = torch.softmax(audio_text_similarity, dim=-1)
-
-                similarities = (1 - alpha) * video_text_similarity + (alpha) * audio_text_similarity
-                similarities = torch.softmax(similarities, dim=-1)
-                max_value, max_index = torch.max(similarities, dim=1)
-                
-                if preprocessed_labels[max_index] == f"A {event.split(',')[0].lower()}":
+                if labels[max_index] == event:
                     if event in refined_segments:
                         refined_segments[event].append((start_time, end_time))
                     else:
@@ -226,106 +178,74 @@ def refine_segments(video_events, video_id, preprocessed_labels):
             return {max_event: [list(max_times)]}
 
         return refined_segments
-    
-def stage3(video_events, video_id, preprocessed_labels):
-    refined_segments = {}
-    video_path = os.path.join(video_dir_path, video_id)
-    video_length = round(get_video_duration(video_path))
-    for event, time_ranges in video_events.items():
-        for start_time, end_time in time_ranges:
-            refined_left_value = start_time
-            refined_right_value = end_time
-            extract_audio(video_path, output_audio_path)
-            og_similarities = get_similiraties(preprocessed_labels, video_path, output_audio_path)
-            og_max_value, _ = torch.max(og_similarities, dim=1)    
-                            
-            if start_time - 1 >= 0:
-                crop_video_and_extract_audio(video_path, start_time - 1, end_time, output_video_path, output_audio_path)
-                similarities = get_similiraties(preprocessed_labels, output_video_path, output_audio_path)
-                max_value, max_index = torch.max(similarities, dim=1)
-                    
-                if (max_value > og_max_value + 0.001) and (preprocessed_labels[max_index] == f"A {event.split(',')[0]}"):
-                    refined_left_value = start_time - 1
-                    og_max_value = max_value
-                
-            if start_time + 1 <= video_length:     
-                crop_video_and_extract_audio(video_path, start_time + 1, end_time, output_video_path, output_audio_path)
-                similarities = get_similiraties(preprocessed_labels, output_video_path, output_audio_path)
-                max_value, max_index = torch.max(similarities, dim=1)
-                    
-                if (max_value > og_max_value + 0.001) and (preprocessed_labels[max_index] == f"A {event.split(',')[0]}"):
-                    refined_left_value = start_time + 1                    
+                 
+def get_similiraties(labels, inputs, alpha):
+    preprocessed_labels = [f"A {label.replace('_', ' ').lower()}" for label in labels]
 
-
-
-            if end_time - 1 >= 0:
-                crop_video_and_extract_audio(video_path, start_time, end_time - 1, output_video_path, output_audio_path)
-                similarities = get_similiraties(preprocessed_labels, output_video_path, output_audio_path)
-                max_value, max_index = torch.max(similarities, dim=1)
-                    
-                if (max_value > og_max_value + 0.001) and (preprocessed_labels[max_index] == f"A {event.split(',')[0]}"):
-                    refined_right_value = end_time - 1
-                    og_max_value = max_value
-                
-            if end_time + 1 <= video_length:     
-                crop_video_and_extract_audio(video_path, start_time, end_time + 1, output_video_path, output_audio_path)
-                similarities = get_similiraties(preprocessed_labels, output_video_path, output_audio_path)
-                max_value, max_index = torch.max(similarities, dim=1)
-                    
-                if (max_value > og_max_value + 0.001) and (preprocessed_labels[max_index] == f"A {event.split(',')[0]}"):
-                    refined_right_value = end_time + 1   
-
-            if event in refined_segments:
-                refined_segments[event].append((refined_left_value, refined_right_value))
-            else:
-                refined_segments[event] = [(refined_left_value, refined_right_value)]
-                                        
-            # print(refined_left_value, refined_right_value)   
-            
-    return refined_segments                       
-
-
-
-def get_similiraties(preprocessed_labels, video_path, audio_path):
-    inputs = {
-        'video': to_device(modality_transform['video']([video_path]), device),
-        'audio': to_device(modality_transform['audio']([audio_path]), device),
-    }
     inputs['language'] = to_device(tokenizer(preprocessed_labels, max_length=77, padding='max_length',
                                                             truncation=True, return_tensors='pt'), device)
 
     with torch.no_grad():
         embeddings = model(inputs)
-
-    video_text_similarity = embeddings['video'] @ embeddings['language'].T   
+    
+    if 'image' in embeddings:
+        if embeddings['image'].shape[0] != embeddings['audio'].shape[0]:
+            embeddings['audio'] = embeddings['audio'].repeat_interleave(args.sample_audio_sec, dim=0)
+        
+        video_text_similarity = embeddings['image'] @ embeddings['language'].T   
+    
+    else:
+        video_text_similarity = embeddings['video'] @ embeddings['language'].T   
+    
     audio_text_similarity = embeddings['audio'] @ embeddings['language'].T
+        
+    if video_text_similarity.shape[0] != audio_text_similarity.shape[0]:
+        last_frame = video_text_similarity[-1].unsqueeze(0)
+        video_text_similarity = torch.cat((video_text_similarity, last_frame), dim=0)
 
     video_text_similarity = torch.softmax(video_text_similarity, dim=-1)
     audio_text_similarity = torch.softmax(audio_text_similarity, dim=-1)
 
-    similarities = (1 - alpha) * video_text_similarity + (alpha) * audio_text_similarity
-    similarities = torch.softmax(similarities, dim=-1)
-    return similarities
+    combined_similarities = (1 - alpha) * video_text_similarity + (alpha) * audio_text_similarity
+    combined_similarities = torch.softmax(combined_similarities, dim=-1)
+
+    return combined_similarities, video_text_similarity, audio_text_similarity
 
 
-def filter_classes(labels, video_id):
+def filter_classes(labels, video_id, filter_threshold):
     video_path = os.path.join(video_dir_path, video_id)
     video_length = get_video_duration(video_path)
     crop_video_and_extract_audio(video_path, 0, video_length, output_video_path, output_audio_path)
-    similiraties = get_similiraties(labels, output_video_path, output_audio_path)
-    indices = torch.nonzero(similiraties > 0.02, as_tuple=False)
-    col_indices = indices[:, 1].tolist()
-    events = [labels[i] for i in col_indices]
 
-    return events
+    inputs = {
+        'video': to_device(modality_transform['video']([output_video_path]), device),
+        'audio': to_device(modality_transform['audio']([output_audio_path]), device),
+    }
+    
+    combined_similarities, video_text_similarity, audio_text_similarity = get_similiraties(labels, inputs, alpha)
+    
+    indices = torch.nonzero(combined_similarities > filter_threshold, as_tuple=False)
+    col_indices = indices[:, 1].tolist()
+    combined_events = [labels[i] for i in col_indices]
+
+    indices = torch.nonzero(video_text_similarity > filter_threshold, as_tuple=False)
+    col_indices = indices[:, 1].tolist()
+    video_events = [labels[i] for i in col_indices]
+
+    indices = torch.nonzero(audio_text_similarity > filter_threshold, as_tuple=False)
+    col_indices = indices[:, 1].tolist()
+    audio_events = [labels[i] for i in col_indices]
+
+    return combined_events, video_events, audio_events
 
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--video_dir_path', required=True, type=str)
-    parser.add_argument('--annotations_file_path', required=True, type=str)
     parser.add_argument('--gpu_id', default=-1, type=int)
-    parser.add_argument('--threshold', default=0.05, type=float)
+    parser.add_argument('--threshold_stage1', default=0.05, type=float)
+    parser.add_argument('--threshold_stage2', default=0.05, type=float)
+    parser.add_argument('--filter_threshold', default=0.02, type=float)
     parser.add_argument('--alpha', default=0.5, type=float)
     parser.add_argument('--candidates_file_path', required=True, type=str)
     parser.add_argument('--sample_audio_sec', default=2, type=int)
@@ -333,21 +253,27 @@ if __name__ == '__main__':
     parser.add_argument('--output_audio_path', default="./cropped_files/cropped_audio.wav", type=str)
     args = parser.parse_args()
 
-    threshold = args.threshold
+    threshold_stage1 = args.threshold_stage1
+    threshold_stage2 = args.threshold_stage2
+
+    filter_threshold = args.filter_threshold
     alpha = args.alpha
     video_dir_path = args.video_dir_path
     output_video_path = args.output_video_path
     output_audio_path = args.output_audio_path
     
     dataset = LLP(args.video_dir_path,
-                  args.annotations_file_path,
                   frames_transforms=language_bind_transform,
                   sample_audio_sec=args.sample_audio_sec)
     
-    labels = list(dataset.class2idx.keys())
+    labels = ['Speech', 'Car', 'Cheering', 'Dog', 'Cat', 'Frying_(food)',
+                  'Basketball_bounce', 'Fire_alarm', 'Chainsaw', 'Cello', 'Banjo',
+                  'Singing', 'Chicken_rooster', 'Violin_fiddle', 'Vacuum_cleaner',
+                  'Baby_laughter', 'Accordion', 'Lawn_mower', 'Motorcycle', 'Helicopter',
+                  'Acoustic_guitar', 'Telephone_bell_ringing', 'Baby_cry_infant_cry', 'Blender',
+                  'Clapping']
 
     device = f"cuda:{args.gpu_id}" if args.gpu_id != -1 else "cpu"
-
 
     clip_type = {
         'video': 'LanguageBind_Video_FT', 
@@ -362,21 +288,19 @@ if __name__ == '__main__':
     tokenizer = LanguageBindImageTokenizer.from_pretrained(pretrained_ckpt, cache_dir='./cache_dir/tokenizer_cache_dir')
     modality_transform = {c: transform_dict[c](model.modality_config[c]) for c in clip_type.keys()}
 
-    candidates = []
-    gt_candidates = []
+    combined_candidates, video_candidates, audio_candidates = [], [], []
     for sample in tqdm(dataset, desc="Processing samples"):
-        frames, audio_dir, label_dict, video_id = sample
+        frames, audio_dir, video_id = sample
         video_id_withot_extention = video_id.replace('.mp4', '')
         audio_paths = [f"{dataset.audio_dir}/{file_name}" for file_name in os.listdir(dataset.audio_dir)]
-        filtered_labels = filter_classes(labels, video_id)
-        video_events = predict(filtered_labels, frames, audio_paths, video_id)
-        candidates.extend(video_events)
-        gt_candidates.extend(convert_gt(label_dict, video_id))
+        combined_results, video_results, audio_results = predict(labels, frames, audio_paths, video_id)
+        
+        combined_candidates.append(combined_results)
+        video_candidates.append(video_results)
+        audio_candidates.append(audio_results)
     
     with open(args.candidates_file_path, 'w') as f:
-        json.dump(candidates, f)
-    
-    with open("GT.json", 'w') as f:
-        json.dump(gt_candidates, f)
-
-
+        json.dump({
+            "combined": combined_results,
+            "video": video_results,
+            "audio": audio_results}, f)
