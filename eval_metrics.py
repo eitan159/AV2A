@@ -2,7 +2,7 @@ import numpy as np
 import argparse
 import json
 import pandas as pd
-
+import os
 
 def Precision(X_pre, X_gt):
 
@@ -287,6 +287,7 @@ def event_wise_metric(event_p, event_gt):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+    parser.add_argument('--video_dir_path', required=True, type=str)
     parser.add_argument('--predictions_json_file_path', required=True, type=str)
     parser.add_argument('--test_csv_file_path', required=True, type=str)
     parser.add_argument('--audio_csv_file_path', required=True, type=str)
@@ -300,11 +301,20 @@ if __name__ == '__main__':
                   'Acoustic_guitar', 'Telephone_bell_ringing', 'Baby_cry_infant_cry', 'Blender',
                   'Clapping']
     
-    id_to_idx = {id.lower(): index for index, id in enumerate(categories)}
+    id_to_idx = {id: index for index, id in enumerate(categories)}
 
     with open(args.predictions_json_file_path, 'r') as f:
         pred = json.load(f)
     
+    download_videos_ids = [video_id.replace(".mp4", "") for video_id in os.listdir(args.video_dir_path) 
+                           if os.path.splitext(os.path.join(args.video_dir_path, video_id))[1] == '.mp4']
+
+    
+    pred_combined = {list(d.keys())[0]: list(d.values())[0] for d in pred["combined"]}
+    pred_video = {list(d.keys())[0]: list(d.values())[0] for d in pred["video"]}
+    pred_audio = {list(d.keys())[0]: list(d.values())[0] for d in pred["audio"]}
+
+
     df = pd.read_csv(args.test_csv_file_path, header=0, sep='\t')
     df_a = pd.read_csv(args.audio_csv_file_path, header=0, sep='\t')
     df_v = pd.read_csv(args.video_csv_file_path, header=0, sep='\t')
@@ -318,9 +328,13 @@ if __name__ == '__main__':
     F_event = []
     F_event_av = []
     for file_name in df["filename"].values:
+        
         parts = file_name.split('_')
         # Join all parts except the last two
-        file_name = '_'.join(parts[:-2])
+        new_file_name = '_'.join(parts[:-2])
+
+        if new_file_name not in download_videos_ids:
+            continue
 
         SO_a = np.zeros((25, 10))
         SO_v = np.zeros((25, 10))
@@ -360,19 +374,19 @@ if __name__ == '__main__':
         
         GT_av = GT_a * GT_v
 
-        if file_name in pred["combined"]:
-            for pred_dict in pred[file_name]:
-                idx, x1, x2 = id_to_idx[pred_dict["class_idx"]], pred_dict["start"], pred_dict["end"]
+        if new_file_name in pred_combined:
+            for pred_dict in pred_combined[new_file_name]:
+                idx, x1, x2 = id_to_idx[pred_dict["event_label"].capitalize()], pred_dict["start"], pred_dict["end"]
                 SO_av[idx, x1:x2] = 1
 
-        if file_name in pred["video"]:
-            for pred_dict in pred[file_name]:
-                idx, x1, x2 = id_to_idx[pred_dict["class_idx"]], pred_dict["start"], pred_dict["end"]
+        if new_file_name in pred_video:
+            for pred_dict in pred_video[new_file_name]:
+                idx, x1, x2 = id_to_idx[pred_dict["event_label"].capitalize()], pred_dict["start"], pred_dict["end"]
                 SO_v[idx, x1:x2] = 1
         
-        if file_name in pred["audio"]:
-            for pred_dict in pred[file_name]:
-                idx, x1, x2 = id_to_idx[pred_dict["class_idx"]], pred_dict["start"], pred_dict["end"]
+        if new_file_name in pred_audio:
+            for pred_dict in pred_audio[new_file_name]:
+                idx, x1, x2 = id_to_idx[pred_dict["event_label"].capitalize()], pred_dict["start"], pred_dict["end"]
                 SO_a[idx, x1:x2] = 1
 
         # segment-level F1 scores
