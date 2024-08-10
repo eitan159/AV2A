@@ -1,27 +1,78 @@
 from torchvision import transforms
+from torchvision.transforms import Compose, Lambda
 import torchaudio
 import numpy as np
 import torch
+from torchvision.transforms._transforms_video import NormalizeVideo, RandomHorizontalFlipVideo, CenterCropVideo
+from pytorchvideo.transforms import ShortSideScale
 
 OPENAI_DATASET_MEAN = (0.48145466, 0.4578275, 0.40821073)
 OPENAI_DATASET_STD = (0.26862954, 0.26130258, 0.27577711)
-language_bind_transform = transforms.Compose(
+language_bind_image_transform = Compose(
         [
-            transforms.ToTensor(),
+            # transforms.ToTensor(),
+            Lambda(lambda x: x / 255.0),
             transforms.Resize(224, interpolation=transforms.InterpolationMode.BICUBIC),
             transforms.CenterCrop(224),
             transforms.Normalize(OPENAI_DATASET_MEAN, OPENAI_DATASET_STD)  # assume image
         ]
     )
 
+
+language_bind_video_transform = Compose(
+            [
+                # UniformTemporalSubsample(num_frames),
+                Lambda(lambda x: x / 255.0),
+                NormalizeVideo(mean=OPENAI_DATASET_MEAN, std=OPENAI_DATASET_STD),
+                ShortSideScale(size=224),
+                CenterCropVideo(224),
+                RandomHorizontalFlipVideo(p=0.5),
+            ]
+        )
+
+class VisionTransform:
+    def __init__(self, num_frames = 8, images_num = 10, video_seconds = 10):
+        self.video_num_frames = num_frames
+        self.images_num = images_num
+        self.video_seconds = video_seconds
+
+    def __call__(self, decord_vr, transform_type, start=None, end=None):
+        fps = len(decord_vr) // 10
+        frames_indicis = list(range(len(decord_vr)))
+        if start != None and end != None:
+            frames_indicis = frames_indicis[start * fps: end * fps]
+        
+        if transform_type == "video":
+            frames_indicis = np.linspace(0, len(frames_indicis) - 1, self.video_num_frames, dtype=int)
+        else:
+            frames_indicis = np.linspace(0, len(frames_indicis) - 1, self.images_num, dtype=int)
+
+        if start != None and end != None:
+            frames_indicis = [frame_idx + start * fps for frame_idx in frames_indicis]
+
+        video_data = decord_vr.get_batch(frames_indicis)
+        
+        if transform_type == "video": 
+            video_data = video_data.permute(3, 0, 1, 2)  # (T, H, W, C) -> (C, T, H, W)
+            video_data = language_bind_video_transform(video_data)
+        elif transform_type == "image":
+            video_data = video_data.permute(0, 3, 1, 2)  # (T, H, W, C) -> (T, C, H, W)
+            video_data = language_bind_image_transform(video_data)
+        else:
+            raise ValueError("transform_type is not defined !!!")
+        
+        return video_data
+
+
+
 DEFAULT_AUDIO_FRAME_SHIFT_MS = 10
 class AudioTransform:
-    def __init__(self, args):
-        self.sample_rate = args.audio_sample_rate
-        self.num_mel_bins = args.num_mel_bins
-        self.target_length = args.target_length
-        self.audio_mean = args.audio_mean
-        self.audio_std = args.audio_std
+    def __init__(self):
+        self.sample_rate = 16000
+        self.num_mel_bins = 112
+        self.target_length = 1036
+        self.audio_mean = -4.2677393
+        self.audio_std = 4.5689974
         self.mean = []
         self.std = []
         # mean=-4.2677393
@@ -29,13 +80,40 @@ class AudioTransform:
         # self.norm = transforms.Normalize(mean=self.audio_mean, std=self.audio_std)
 
 
-    def __call__(self, audio_data_and_origin_sr):
+    def __call__(self, audio_data_and_origin_sr, start_sec=None, end_sec=None):
         audio_data, origin_sr = audio_data_and_origin_sr
+
+        if start_sec != None and end_sec != None:
+            audio_data = self.crop_audio(audio_data, origin_sr, start_sec, end_sec)
+
         if self.sample_rate != origin_sr:
             # print(audio_data.shape, origin_sr)
             audio_data = torchaudio.functional.resample(audio_data, orig_freq=origin_sr, new_freq=self.sample_rate)
         waveform_melspec = self.waveform2melspec(audio_data)
         return waveform_melspec
+    
+    def crop_audio(self, waveform, sample_rate, start_sec, end_sec):
+        # Calculate the start and end sample indices
+        start_sample = int(start_sec * sample_rate)
+        end_sample = int(end_sec * sample_rate)
+        
+        # Ensure end_sample does not exceed the length of the waveform
+        end_sample = min(end_sample, waveform.shape[1])
+
+        # Crop the waveform
+        cropped_waveform = waveform[:, start_sample:end_sample]
+        
+        return cropped_waveform
+
+    def split_sample_audio(self, audio_data_and_origin_sr, sample_audio_sec):
+        origin_audio_data, origin_sr = audio_data_and_origin_sr
+        total_seconds = origin_audio_data.shape[1] // origin_sr
+        output = []
+        for t in range(0, total_seconds, sample_audio_sec):
+            audio_data = self.crop_audio(origin_audio_data, origin_sr, t, t + sample_audio_sec)
+            output.append(self((audio_data, origin_sr)))
+
+        return torch.stack(output)
 
 
     def waveform2melspec(self, audio_data):
