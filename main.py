@@ -45,10 +45,12 @@ def predict(labels, decord_vr, waveform_and_sr, video_id):
         'image': {"pixel_values": vision_transforms(decord_vr, transform_type='image').to(device)},
         'audio': {"pixel_values": audio_transforms.split_sample_audio(waveform_and_sr, args.sample_audio_sec).to(device)},
     }
-    combined_similarities, _, _ = get_similiraties(combined_filtered_labels, inputs, alpha)
-    _, video_text_similarties, _ = get_similiraties(video_filtered_labels, inputs, alpha)
-    _, _, audio_text_similarites = get_similiraties(audio_filtered_labels, inputs, alpha)
-
+    try:
+        combined_similarities, _, _ = get_similiraties(combined_filtered_labels, inputs, alpha)
+        _, video_text_similarties, _ = get_similiraties(video_filtered_labels, inputs, alpha)
+        _, _, audio_text_similarites = get_similiraties(audio_filtered_labels, inputs, alpha)
+    except:
+        print(f"Problem with this video id: {video_id}")
 
     combined_results = optimize(combined_similarities, decord_vr, waveform_and_sr, combined_filtered_labels, video_id, "combined")
     video_results = optimize(video_text_similarties, decord_vr, waveform_and_sr, video_filtered_labels, video_id, "video")
@@ -197,9 +199,15 @@ def get_similiraties(labels, inputs, alpha):
     
     audio_text_similarity = embeddings['audio'] @ embeddings['language'].T
         
-    if video_text_similarity.shape[0] != audio_text_similarity.shape[0]:
-        last_frame = video_text_similarity[-1].unsqueeze(0)
-        video_text_similarity = torch.cat((video_text_similarity, last_frame), dim=0)
+    if video_text_similarity.shape[0] < audio_text_similarity.shape[0]:
+        pad = torch.zeros_like(video_text_similarity[0].unsqueeze(0)).to(device)
+        pad = pad.repeat_interleave(audio_text_similarity.shape[0] - video_text_similarity.shape[0])
+        video_text_similarity = torch.cat((video_text_similarity, pad), dim=0)
+    elif video_text_similarity.shape[0] > audio_text_similarity.shape[0]:
+        pad = torch.zeros_like(audio_text_similarity[0].unsqueeze(0)).to(device)
+        pad = pad.repeat(video_text_similarity.shape[0] - audio_text_similarity.shape[0], 1)
+        audio_text_similarity = torch.cat((audio_text_similarity, pad), dim=0)
+
 
     video_text_similarity = torch.softmax(video_text_similarity, dim=-1)
     audio_text_similarity = torch.softmax(audio_text_similarity, dim=-1)
