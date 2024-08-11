@@ -13,5 +13,6 @@ __pycache__
 *.sh
 *.out
 *.txt
+*.csv
 sample_audio_chunks/
 cropped_files/
