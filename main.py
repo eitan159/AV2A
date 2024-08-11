@@ -45,12 +45,9 @@ def predict(labels, decord_vr, waveform_and_sr, video_id):
         'image': {"pixel_values": vision_transforms(decord_vr, transform_type='image').to(device)},
         'audio': {"pixel_values": audio_transforms.split_sample_audio(waveform_and_sr, args.sample_audio_sec).to(device)},
     }
-    try:
-        combined_similarities, _, _ = get_similiraties(combined_filtered_labels, inputs, alpha)
-        _, video_text_similarties, _ = get_similiraties(video_filtered_labels, inputs, alpha)
-        _, _, audio_text_similarites = get_similiraties(audio_filtered_labels, inputs, alpha)
-    except:
-        print(f"Problem with this video id: {video_id}")
+    combined_similarities, _, _ = get_similiraties(combined_filtered_labels, inputs, alpha)
+    _, video_text_similarties, _ = get_similiraties(video_filtered_labels, inputs, alpha)
+    _, _, audio_text_similarites = get_similiraties(audio_filtered_labels, inputs, alpha)
 
     combined_results = optimize(combined_similarities, decord_vr, waveform_and_sr, combined_filtered_labels, video_id, "combined")
     video_results = optimize(video_text_similarties, decord_vr, waveform_and_sr, video_filtered_labels, video_id, "video")
