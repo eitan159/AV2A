@@ -139,25 +139,26 @@ def refine_segments(video_events, decord_vr, waveform_and_sr, labels, similarity
                 }
                 combined_similarities, video_text_similarties, audio_text_similarties = get_similiraties(labels, inputs, alpha)
                 
-                # TODO use threshold_stage 2 here !!!
                 if similarity_type == "combined":
-                    max_value, max_index = torch.max(combined_similarities, dim=1)
+                    events = events_above_threshold(labels, combined_similarities, threshold_stage2)
+                    similarities = combined_similarities[0]
                 elif similarity_type == "video":
-                    max_value, max_index = torch.max(video_text_similarties, dim=1)
+                    events = events_above_threshold(labels, video_text_similarties, threshold_stage2)
+                    similarities = video_text_similarties[0]
                 else:
-                    max_value, max_index = torch.max(audio_text_similarties, dim=1)
+                    events = events_above_threshold(labels, audio_text_similarties, threshold_stage2)
+                    similarities = audio_text_similarties[0]
 
-
-                if labels[max_index] == event:
+                if event in events:
                     if event in refined_segments:
                         refined_segments[event].append((start_time, end_time))
                     else:
                         refined_segments[event] = [(start_time, end_time)]
                 
                 if event in past_segments:
-                    past_segments[event].append(((start_time, end_time), max_value))
+                    past_segments[event].append(((start_time, end_time), similarities[labels.index(event)]))
                 else:
-                    past_segments[event] = [((start_time, end_time), max_value)]
+                    past_segments[event] = [((start_time, end_time), similarities[labels.index(event)])]
         
         if not refined_segments:
             max_score = float('-inf')
@@ -223,20 +224,19 @@ def filter_classes(labels, decord_vr, waveform_and_sr, filter_threshold):
     }
     
     combined_similarities, video_text_similarity, audio_text_similarity = get_similiraties(labels, inputs, alpha)
-    
-    indices = torch.nonzero(combined_similarities > filter_threshold, as_tuple=False)
-    col_indices = indices[:, 1].tolist()
-    combined_events = [labels[i] for i in col_indices]
 
-    indices = torch.nonzero(video_text_similarity > filter_threshold, as_tuple=False)
-    col_indices = indices[:, 1].tolist()
-    video_events = [labels[i] for i in col_indices]
-
-    indices = torch.nonzero(audio_text_similarity > filter_threshold, as_tuple=False)
-    col_indices = indices[:, 1].tolist()
-    audio_events = [labels[i] for i in col_indices]
+    combined_events = events_above_threshold(labels, combined_similarities, filter_threshold)
+    video_events = events_above_threshold(labels, video_text_similarity, filter_threshold)
+    audio_events = events_above_threshold(labels, audio_text_similarity, filter_threshold)
 
     return combined_events, video_events, audio_events
+
+def events_above_threshold(labels, similarities, threshold):
+    indices = torch.nonzero(similarities > threshold, as_tuple=False)
+    col_indices = indices[:, 1].tolist()
+    events = [labels[i] for i in col_indices]
+
+    return events
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
