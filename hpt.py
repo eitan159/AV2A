@@ -67,11 +67,11 @@ def sweep():
 
 if __name__ == "__main__":
     hyperparameter_defaults = dict(
-        sample_audio_sec = 1,
-        alpha = 2,
-        filter_threshold = 64,
-        threshold_stage1 = 64,
-        threshold_stage2 = 'sgd'
+        sample_audio_sec = 2,
+        alpha = 0.5,
+        filter_threshold = 0.6,
+        threshold_stage1 = 0.6,
+        threshold_stage2 = 0.6
     )
 
     video_dir_path = ""
