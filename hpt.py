@@ -57,7 +57,7 @@ def sweep():
         "F_event_a": metrices['F_event_a'] ,
         "F_event_v": metrices['F_event_v'] ,
         "F_event_av": metrices['F_event_av'],
-        "avg_type": metrices['avg_type'],
+        "avg_type_event": metrices['avg_type_event'],
         "avg_event_level": metrices['avg_event_level'],
         "alpha": config.alpha,
         "filter_threshold": config.filter_threshold,
