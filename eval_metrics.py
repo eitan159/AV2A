@@ -285,7 +285,7 @@ def event_wise_metric(event_p, event_gt):
                 FN += 1
     return TP, FP, FN
 
-def calculate_metrices(video_dir_path, pred, categories):
+def calculate_metrices(video_dir_path, pred, categories, split="test"):
 
     id_to_idx = {id: index for index, id in enumerate(categories)}
     
@@ -298,7 +298,7 @@ def calculate_metrices(video_dir_path, pred, categories):
     pred_audio = {list(d.keys())[0]: list(d.values())[0] for d in pred["audio"]}
 
 
-    df = pd.read_csv("annotations/AVVP_test_pd.csv", header=0, sep='\t')
+    df = pd.read_csv(f"annotations/AVVP_{split}_pd.csv", header=0, sep='\t')
     df_a = pd.read_csv("annotations/AVVP_eval_audio.csv", header=0, sep='\t')
     df_v = pd.read_csv("annotations/AVVP_eval_visual.csv", header=0, sep='\t')
     

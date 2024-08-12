@@ -46,7 +46,7 @@ def sweep():
                     "video": video_candidates,
                     "audio": video_candidates}
     
-    metrices = calculate_metrices(video_dir_path, predictions, labels)
+    metrices = calculate_metrices(video_dir_path, predictions, labels, split="val")
 
     wandb.log({
         "F_seg_a": metrices['F_seg_a'] ,
