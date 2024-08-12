@@ -6,8 +6,8 @@ parameters:
   alpha:
       values: [ 0.5, 0.4, 0.6 ]
   filter_threshold:
-      values: [ 48, 64, 72 ]
+      values: [ 0.6, 0.7 ]
   threshold_stage1:
-      values: [ 48, 64, 72 ]
+      values: [ 0.6, 0.7 ]
   threshold_stage2:
-      values: [ 48, 64, 72 ]
+      values: [ 0.6, 0.7 ]

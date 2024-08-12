@@ -217,10 +217,10 @@ class VideoParserOptimizer():
             pad = pad.repeat(video_text_similarity.shape[0] - audio_text_similarity.shape[0], 1)
             audio_text_similarity = torch.cat((audio_text_similarity, pad), dim=0)
         
-        video_text_similarity_norm = (video_text_similarity - torch.mean(video_text_similarity)) / torch.std(video_text_similarity)
+        video_text_similarity_norm = (video_text_similarity - torch.mean(video_text_similarity, dim=-1, keepdim=True)) / torch.std(video_text_similarity, dim=-1, keepdim=True)
         video_text_similarity_sigmoid_norm = torch.sigmoid(video_text_similarity_norm)
 
-        audio_text_similarity_norm = (audio_text_similarity - torch.mean(audio_text_similarity)) / torch.std(audio_text_similarity)
+        audio_text_similarity_norm = (audio_text_similarity - torch.mean(audio_text_similarity, dim=-1, keepdim=True)) / torch.std(audio_text_similarity, dim=-1, keepdim=True)
         audio_text_similarity_sigmoid_norm = torch.sigmoid(audio_text_similarity_norm)
 
         combined_similarities = (1 - alpha) * video_text_similarity_sigmoid_norm + (alpha) * audio_text_similarity_sigmoid_norm
@@ -242,7 +242,7 @@ class VideoParserOptimizer():
 
         return combined_events, video_events, audio_events
 
-    def events_above_threshold(labels, similarities, threshold):
+    def events_above_threshold(self, labels, similarities, threshold):
         indices = torch.nonzero(similarities > threshold, as_tuple=False)
         col_indices = indices[:, 1].tolist()
         events = [labels[i] for i in col_indices]
