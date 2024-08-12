@@ -185,19 +185,13 @@ def get_similiraties(labels, inputs, alpha):
     with torch.no_grad():
         embeddings = model(inputs)
     
-    embeddings['audio'] /= embeddings['audio'].norm(dim=-1, keepdim=True)
-    embeddings['language'] /= embeddings['language'].norm(dim=-1, keepdim=True)    
-    if 'image' in embeddings:
-        embeddings['image'] /= embeddings['image'].norm(dim=-1, keepdim=True)
-        
+    if 'image' in embeddings:        
         if embeddings['image'].shape[0] != embeddings['audio'].shape[0]:
             embeddings['audio'] = embeddings['audio'].repeat_interleave(args.sample_audio_sec, dim=0)
         
         video_text_similarity = embeddings['image'] @ embeddings['language'].T   
     
     else:
-        embeddings['video'] /= embeddings['video'].norm(dim=-1, keepdim=True)
-
         video_text_similarity = embeddings['video'] @ embeddings['language'].T   
     
     audio_text_similarity = embeddings['audio'] @ embeddings['language'].T
@@ -217,13 +211,7 @@ def get_similiraties(labels, inputs, alpha):
     audio_text_similarity_norm = (audio_text_similarity - torch.mean(audio_text_similarity)) / torch.std(audio_text_similarity)
     audio_text_similarity_sigmoid_norm = torch.sigmoid(audio_text_similarity_norm)
 
-    # video_text_similarity = torch.softmax(video_text_similarity, dim=-1)
-    # audio_text_similarity = torch.softmax(audio_text_similarity, dim=-1)
-
     combined_similarities = (1 - alpha) * video_text_similarity_sigmoid_norm + (alpha) * audio_text_similarity_sigmoid_norm
-    # combined_similarities =  video_text_similarity_sigmoid_norm  * audio_text_similarity_sigmoid_norm
-
-    # combined_similarities = torch.softmax(combined_similarities, dim=-1)
 
     return combined_similarities, video_text_similarity_sigmoid_norm, audio_text_similarity_sigmoid_norm
 
