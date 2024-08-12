@@ -285,12 +285,9 @@ def event_wise_metric(event_p, event_gt):
                 FN += 1
     return TP, FP, FN
 
-def calculate_metrices(video_dir_path, predictions_json_file_path, categories):
+def calculate_metrices(video_dir_path, pred, categories):
 
     id_to_idx = {id: index for index, id in enumerate(categories)}
-
-    with open(predictions_json_file_path, 'r') as f:
-        pred = json.load(f)
     
     download_videos_ids = [video_id.replace(".mp4", "") for video_id in os.listdir(video_dir_path) 
                            if os.path.splitext(os.path.join(video_dir_path, video_id))[1] == '.mp4']
@@ -388,25 +385,37 @@ def calculate_metrices(video_dir_path, predictions_json_file_path, categories):
         F_event_v.append(f_v)
         F_event.append(f)
         F_event_av.append(f_av)
-        
-    print('Audio Event Detection Segment-level F1: {:.1f}'.format(100 * np.mean(np.array(F_seg_a))))
-    print('Visual Event Detection Segment-level F1: {:.1f}'.format(100 * np.mean(np.array(F_seg_v))))
-    print('Audio-Visual Event Detection Segment-level F1: {:.1f}'.format(100 * np.mean(np.array(F_seg_av))))
+    
+    metrices = {}
+    metrices['F_seg_a'] = 100 * np.mean(np.array(F_seg_a))
+    metrices['F_seg_v'] = 100 * np.mean(np.array(F_seg_v))
+    metrices['F_seg_av'] = 100 * np.mean(np.array(F_seg_av))
+    metrices['avg_type'] = (100 * np.mean(np.array(F_seg_av)) + 100 * np.mean(np.array(F_seg_a)) + 100 * np.mean(np.array(F_seg_v))) / 3.
+    metrices['avg_event'] = 100 * np.mean(np.array(F_seg))
 
-    avg_type = (100 * np.mean(np.array(F_seg_av))+100 * np.mean(np.array(F_seg_a))+100 * np.mean(np.array(F_seg_v)))/3.
-    avg_event = 100 * np.mean(np.array(F_seg))
-    print('Segment-levelType@Avg. F1: {:.1f}'.format(avg_type))
-    print('Segment-level Event@Avg. F1: {:.1f}'.format(avg_event))
+    metrices['F_event_a'] = 100 * np.mean(np.array(F_event_a))
+    metrices['F_event_v'] = 100 * np.mean(np.array(F_event_v))
+    metrices['F_event_av'] = 100 * np.mean(np.array(F_event_av))
+    metrices['avg_type_event'] = (100 * np.mean(np.array(F_event_av)) + 100 * np.mean(np.array(F_event_a)) + 100 * np.mean(np.array(F_event_v))) / 3.
+    metrices['avg_event_level'] = 100 * np.mean(np.array(F_event))
 
-    print('Audio Event Detection Event-level F1: {:.1f}'.format(100 * np.mean(np.array(F_event_a))))
-    print('Visual Event Detection Event-level F1: {:.1f}'.format(100 * np.mean(np.array(F_event_v))))
-    print('Audio-Visual Event Detection Event-level F1: {:.1f}'.format(100 * np.mean(np.array(F_event_av))))
+    return metrices
 
-    avg_type_event = (100 * np.mean(np.array(F_event_av)) + 100 * np.mean(np.array(F_event_a)) + 100 * np.mean(
-        np.array(F_event_v))) / 3.
-    avg_event_level = 100 * np.mean(np.array(F_event))
-    print('Event-level Type@Avg. F1: {:.1f}'.format(avg_type_event))
-    print('Event-level Event@Avg. F1: {:.1f}'.format(avg_event_level))
+def print_metrices(metrices):
+
+    print('Audio Event Detection Segment-level F1: {:.1f}'.format(metrices['F_seg_a']))
+    print('Visual Event Detection Segment-level F1: {:.1f}'.format(metrices['F_seg_v']))
+    print('Audio-Visual Event Detection Segment-level F1: {:.1f}'.format(metrices['F_seg_av']))
+
+    print('Segment-levelType@Avg. F1: {:.1f}'.format(metrices['avg_type']))
+    print('Segment-level Event@Avg. F1: {:.1f}'.format(metrices['avg_event']))
+
+    print('Audio Event Detection Event-level F1: {:.1f}'.format(metrices['F_event_a']))
+    print('Visual Event Detection Event-level F1: {:.1f}'.format(metrices['F_event_v']))
+    print('Audio-Visual Event Detection Event-level F1: {:.1f}'.format(metrices['F_event_av']))
+
+    print('Event-level Type@Avg. F1: {:.1f}'.format(metrices['avg_type_event']))
+    print('Event-level Event@Avg. F1: {:.1f}'.format(metrices['avg_event_level']))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -421,8 +430,10 @@ if __name__ == '__main__':
                   'Acoustic_guitar', 'Telephone_bell_ringing', 'Baby_cry_infant_cry', 'Blender',
                   'Clapping']
     
-    calculate_metrices(args.video_dir_path, args.predictions_json_file_path, categories)
+    with open(args.predictions_json_file_path, 'r') as f:
+        pred = json.load(f)
 
+    print_metrices(calculate_metrices(args.video_dir_path, pred, categories))
     
             
 
