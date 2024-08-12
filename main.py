@@ -185,13 +185,19 @@ def get_similiraties(labels, inputs, alpha):
     with torch.no_grad():
         embeddings = model(inputs)
     
+    embeddings['audio'] /= embeddings['audio'].norm(dim=-1, keepdim=True)
+    embeddings['language'] /= embeddings['language'].norm(dim=-1, keepdim=True)    
     if 'image' in embeddings:
+        embeddings['image'] /= embeddings['image'].norm(dim=-1, keepdim=True)
+        
         if embeddings['image'].shape[0] != embeddings['audio'].shape[0]:
             embeddings['audio'] = embeddings['audio'].repeat_interleave(args.sample_audio_sec, dim=0)
         
         video_text_similarity = embeddings['image'] @ embeddings['language'].T   
     
     else:
+        embeddings['video'] /= embeddings['video'].norm(dim=-1, keepdim=True)
+
         video_text_similarity = embeddings['video'] @ embeddings['language'].T   
     
     audio_text_similarity = embeddings['audio'] @ embeddings['language'].T
