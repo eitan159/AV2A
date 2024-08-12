@@ -185,7 +185,7 @@ def get_similiraties(labels, inputs, alpha):
     with torch.no_grad():
         embeddings = model(inputs)
     
-    if 'image' in embeddings:
+    if 'image' in embeddings:        
         if embeddings['image'].shape[0] != embeddings['audio'].shape[0]:
             embeddings['audio'] = embeddings['audio'].repeat_interleave(args.sample_audio_sec, dim=0)
         
@@ -204,15 +204,16 @@ def get_similiraties(labels, inputs, alpha):
         pad = torch.zeros_like(audio_text_similarity[0].unsqueeze(0)).to(device)
         pad = pad.repeat(video_text_similarity.shape[0] - audio_text_similarity.shape[0], 1)
         audio_text_similarity = torch.cat((audio_text_similarity, pad), dim=0)
+    
+    video_text_similarity_norm = (video_text_similarity - torch.mean(video_text_similarity)) / torch.std(video_text_similarity)
+    video_text_similarity_sigmoid_norm = torch.sigmoid(video_text_similarity_norm)
 
+    audio_text_similarity_norm = (audio_text_similarity - torch.mean(audio_text_similarity)) / torch.std(audio_text_similarity)
+    audio_text_similarity_sigmoid_norm = torch.sigmoid(audio_text_similarity_norm)
 
-    video_text_similarity = torch.softmax(video_text_similarity, dim=-1)
-    audio_text_similarity = torch.softmax(audio_text_similarity, dim=-1)
+    combined_similarities = (1 - alpha) * video_text_similarity_sigmoid_norm + (alpha) * audio_text_similarity_sigmoid_norm
 
-    combined_similarities = (1 - alpha) * video_text_similarity + (alpha) * audio_text_similarity
-    combined_similarities = torch.softmax(combined_similarities, dim=-1)
-
-    return combined_similarities, video_text_similarity, audio_text_similarity
+    return combined_similarities, video_text_similarity_sigmoid_norm, audio_text_similarity_sigmoid_norm
 
 
 def filter_classes(labels, decord_vr, waveform_and_sr, filter_threshold):
@@ -242,10 +243,10 @@ if __name__ == '__main__':
     parser.add_argument('--video_dir_path', required=True, type=str)    
     parser.add_argument('--audio_dir_path', required=True, type=str)
     parser.add_argument('--gpu_id', default=-1, type=int)
-    parser.add_argument('--threshold_stage1', default=0.05, type=float)
-    parser.add_argument('--threshold_stage2', default=0.05, type=float)
-    parser.add_argument('--filter_threshold', default=0.02, type=float)
-    parser.add_argument('--alpha', default=0.5, type=float)
+    parser.add_argument('--threshold_stage1', default=0.6, type=float)
+    parser.add_argument('--threshold_stage2', default=0.6, type=float)
+    parser.add_argument('--filter_threshold', default=0.5, type=float)
+    parser.add_argument('--alpha', default=0.4, type=float)
     parser.add_argument('--candidates_file_path', required=True, type=str)
     parser.add_argument('--sample_audio_sec', default=2, type=int)
     parser.add_argument('--output_video_path', default="./cropped_files/cropped_video.mp4", type=str)
