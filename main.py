@@ -4,7 +4,7 @@ import torch
 from tqdm import tqdm
 import argparse
 import numpy as np
-import os
+from eval_metrics import calculate_metrices
 from models.languagebindmodel.languagebind import LanguageBind, LanguageBindImageTokenizer, to_device
 from data_transforms import VisionTransform, AudioTransform
 
@@ -303,3 +303,5 @@ if __name__ == '__main__':
             "combined": combined_candidates,
             "video": video_candidates,
             "audio": video_candidates}, f)
+
+    calculate_metrices(args.video_dir_path, args.candidates_file_path, labels)

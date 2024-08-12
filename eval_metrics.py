@@ -285,29 +285,15 @@ def event_wise_metric(event_p, event_gt):
                 FN += 1
     return TP, FP, FN
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--video_dir_path', required=True, type=str)
-    parser.add_argument('--predictions_json_file_path', required=True, type=str)
-    parser.add_argument('--test_csv_file_path', required=True, type=str)
-    parser.add_argument('--audio_csv_file_path', required=True, type=str)
-    parser.add_argument('--video_csv_file_path', required=True, type=str)
-    args = parser.parse_args()
+def calculate_metrices(video_dir_path, predictions_json_file_path, categories):
 
-    categories = ['Speech', 'Car', 'Cheering', 'Dog', 'Cat', 'Frying_(food)',
-                  'Basketball_bounce', 'Fire_alarm', 'Chainsaw', 'Cello', 'Banjo',
-                  'Singing', 'Chicken_rooster', 'Violin_fiddle', 'Vacuum_cleaner',
-                  'Baby_laughter', 'Accordion', 'Lawn_mower', 'Motorcycle', 'Helicopter',
-                  'Acoustic_guitar', 'Telephone_bell_ringing', 'Baby_cry_infant_cry', 'Blender',
-                  'Clapping']
-    
     id_to_idx = {id: index for index, id in enumerate(categories)}
 
-    with open(args.predictions_json_file_path, 'r') as f:
+    with open(predictions_json_file_path, 'r') as f:
         pred = json.load(f)
     
-    download_videos_ids = [video_id.replace(".mp4", "") for video_id in os.listdir(args.video_dir_path) 
-                           if os.path.splitext(os.path.join(args.video_dir_path, video_id))[1] == '.mp4']
+    download_videos_ids = [video_id.replace(".mp4", "") for video_id in os.listdir(video_dir_path) 
+                           if os.path.splitext(os.path.join(video_dir_path, video_id))[1] == '.mp4']
 
     
     pred_combined = {list(d.keys())[0]: list(d.values())[0] for d in pred["combined"]}
@@ -315,9 +301,9 @@ if __name__ == '__main__':
     pred_audio = {list(d.keys())[0]: list(d.values())[0] for d in pred["audio"]}
 
 
-    df = pd.read_csv(args.test_csv_file_path, header=0, sep='\t')
-    df_a = pd.read_csv(args.audio_csv_file_path, header=0, sep='\t')
-    df_v = pd.read_csv(args.video_csv_file_path, header=0, sep='\t')
+    df = pd.read_csv("annotations/AVVP_test_pd.csv", header=0, sep='\t')
+    df_a = pd.read_csv("annotations/AVVP_eval_audio.csv", header=0, sep='\t')
+    df_v = pd.read_csv("annotations/AVVP_eval_visual.csv", header=0, sep='\t')
     
     F_seg_a = []
     F_seg_v = []
@@ -421,6 +407,23 @@ if __name__ == '__main__':
     avg_event_level = 100 * np.mean(np.array(F_event))
     print('Event-level Type@Avg. F1: {:.1f}'.format(avg_type_event))
     print('Event-level Event@Avg. F1: {:.1f}'.format(avg_event_level))
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--video_dir_path', required=True, type=str)
+    parser.add_argument('--predictions_json_file_path', required=True, type=str)
+    args = parser.parse_args()
+
+    categories = ['Speech', 'Car', 'Cheering', 'Dog', 'Cat', 'Frying_(food)',
+                  'Basketball_bounce', 'Fire_alarm', 'Chainsaw', 'Cello', 'Banjo',
+                  'Singing', 'Chicken_rooster', 'Violin_fiddle', 'Vacuum_cleaner',
+                  'Baby_laughter', 'Accordion', 'Lawn_mower', 'Motorcycle', 'Helicopter',
+                  'Acoustic_guitar', 'Telephone_bell_ringing', 'Baby_cry_infant_cry', 'Blender',
+                  'Clapping']
+    
+    calculate_metrices(args.video_dir_path, args.predictions_json_file_path, categories)
+
+    
             
 
 
