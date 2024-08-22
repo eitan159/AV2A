@@ -31,7 +31,7 @@ def sweep():
     # modality_transform = {c: transform_dict[c](model.modality_config[c]) for c in clip_type.keys()}
 
     model = VideoParserOptimizer(model, tokenizer, labels, device, config.sample_audio_sec, config.alpha, 
-                            config.filter_threshold, config.threshold_stage1, config.threshold_stage2)
+                            config.filter_threshold, config.threshold_stage1, config.threshold_stage2, config.gamma)
 
     combined_candidates, video_candidates, audio_candidates = [], [], []
     for sample in dataset:
@@ -62,7 +62,8 @@ def sweep():
         "alpha": config.alpha,
         "filter_threshold": config.filter_threshold,
         "threshold_stage1": config.threshold_stage1,
-        "threshold_stage2": config.threshold_stage2
+        "threshold_stage2": config.threshold_stage2,
+        "gamma": config.gamma
     })
 
 if __name__ == "__main__":
@@ -71,12 +72,13 @@ if __name__ == "__main__":
         alpha = 0.5,
         filter_threshold = 0.6,
         threshold_stage1 = 0.6,
-        threshold_stage2 = 0.6
+        threshold_stage2 = 0.6,
+        gamma = 0.85
     )
 
-    video_dir_path = ""
-    audio_dir_path = ""
+    video_dir_path = "/media/data2/shaulov/LLP/val_video"
+    audio_dir_path = "/media/data2/shaulov/LLP/val_audio"
 
-    wandb.init(config=hyperparameter_defaults, project="Video-Parsing-HPT")
+    wandb.init(config=hyperparameter_defaults, project="Video-Parsing-HPT-BBSE")
     config = wandb.config
     sweep()
