@@ -2,7 +2,7 @@ import torch
 import numpy as np
 from models.languagebindmodel.languagebind import to_device
 from data_transforms import VisionTransform, AudioTransform
-
+from label_shift import estimate_labelshift_ratio
 
 class VideoParserOptimizer():
     def __init__(self, model, tokenizer, labels, device, sample_audio_sec, alpha, 
@@ -34,11 +34,25 @@ class VideoParserOptimizer():
 
     def optimize(self, similarities, decord_vr, waveform_and_sr, labels, video_id, similarity_type):
         image_events_dict = {}
-        for event_dim in range(similarities.shape[0]):
+        thresholds = np.full(len(labels), self.threshold_stage1)
+        for event_dim in range(similarities.shape[0] - 1):
             tensor_slice_np = similarities[event_dim].cpu().numpy()
-            indices = np.where(tensor_slice_np > self.threshold_stage1)[0]
+            indices = np.where(tensor_slice_np > thresholds)[0]
             events = [labels[i] for i in indices]
+            
+            thresholds -= 0.2 * estimate_labelshift_ratio((similarities[:event_dim+1] > self.threshold_stage1).int().cpu().numpy(), similarities[:event_dim+1].cpu().numpy(), 
+                                                             np.expand_dims(similarities[event_dim + 1].cpu().numpy(), 0), len(labels))
+      
+            
+            # labelshift_ratio = estimate_labelshift_ratio(np.expand_dims((tensor_slice_np > self.threshold_stage1)*1, 0), np.expand_dims(tensor_slice_np, 0), 
+            #                                                  np.expand_dims(similarities[event_dim + 1].cpu().numpy(), 0), len(labels))
             image_events_dict[f"frame-{event_dim}"] = events
+
+
+        tensor_slice_np = similarities[len(similarities) - 1].cpu().numpy()
+        indices = np.where(tensor_slice_np > thresholds)[0]
+        events = [labels[i] for i in indices]
+        image_events_dict[f"frame-{len(similarities) - 1}"] = events
 
 
         results = self.optimize_video_events(image_events_dict)
@@ -248,4 +262,3 @@ class VideoParserOptimizer():
         events = [labels[i] for i in col_indices]
 
         return events
-
