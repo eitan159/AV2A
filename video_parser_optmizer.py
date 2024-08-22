@@ -6,7 +6,7 @@ from label_shift import estimate_labelshift_ratio
 
 class VideoParserOptimizer():
     def __init__(self, model, tokenizer, labels, device, sample_audio_sec, alpha, 
-                 filter_threshold, threshold_stage1, threshold_stage2) -> None:
+                 filter_threshold, threshold_stage1, threshold_stage2, gamma) -> None:
         self.model = model
         self.tokenizer = tokenizer
         self.labels = labels
@@ -19,7 +19,8 @@ class VideoParserOptimizer():
         self.threshold_stage1 = threshold_stage1
         self.threshold_stage2 = threshold_stage2
         self.filter_threshold = filter_threshold
-    
+        self.gamma = gamma
+        
     def convert_results(self, results, video_id):
         coverted_results = []
         for event_label, event_segments in results.items():
@@ -35,12 +36,13 @@ class VideoParserOptimizer():
     def optimize(self, similarities, decord_vr, waveform_and_sr, labels, video_id, similarity_type):
         image_events_dict = {}
         thresholds = np.full(len(labels), self.threshold_stage1)
+        count_events = np.zeros(len(labels))
         for event_dim in range(similarities.shape[0] - 1):
             tensor_slice_np = similarities[event_dim].cpu().numpy()
             indices = np.where(tensor_slice_np > thresholds)[0]
             events = [labels[i] for i in indices]
-            
-            thresholds -= (1 / len(labels)) * estimate_labelshift_ratio((similarities[:event_dim+1] > self.threshold_stage1).int().cpu().numpy(), similarities[:event_dim+1].cpu().numpy(), 
+            count_events[indices] += 1
+            thresholds -= (self.threshold_stage1 * np.e**(-self.gamma*count_events)) * estimate_labelshift_ratio((similarities[:event_dim+1] > self.threshold_stage1).int().cpu().numpy(), similarities[:event_dim+1].cpu().numpy(), 
                                                              np.expand_dims(similarities[event_dim + 1].cpu().numpy(), 0), len(labels))
       
             

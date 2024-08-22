@@ -15,6 +15,7 @@ if __name__ == '__main__':
     parser.add_argument('--threshold_stage2', default=0.6, type=float)
     parser.add_argument('--filter_threshold', default=0.5, type=float)
     parser.add_argument('--alpha', default=0.4, type=float)
+    parser.add_argument('--gamma', default=0.8, type=float)
     parser.add_argument('--candidates_file_path', required=True, type=str)
     parser.add_argument('--sample_audio_sec', default=2, type=int)
     parser.add_argument('--output_video_path', default="./cropped_files/cropped_video.mp4", type=str)
@@ -26,6 +27,7 @@ if __name__ == '__main__':
 
     filter_threshold = args.filter_threshold
     alpha = args.alpha
+    gamma = args.gamma
     video_dir_path = args.video_dir_path
     output_video_path = args.output_video_path
     output_audio_path = args.output_audio_path
@@ -57,7 +59,7 @@ if __name__ == '__main__':
     # modality_transform = {c: transform_dict[c](model.modality_config[c]) for c in clip_type.keys()}
 
     model = VideoParserOptimizer(model, tokenizer, labels, device, args.sample_audio_sec, alpha, 
-                            filter_threshold, threshold_stage1, threshold_stage2)
+                            filter_threshold, threshold_stage1, threshold_stage2, gamma)
 
     combined_candidates, video_candidates, audio_candidates = [], [], []
     for sample in tqdm(dataset, desc="Processing samples"):
