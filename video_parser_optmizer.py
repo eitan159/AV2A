@@ -42,7 +42,7 @@ class VideoParserOptimizer():
             indices = np.where(tensor_slice_np > thresholds)[0]
             events = [labels[i] for i in indices]
             count_events[indices] += 1
-            thresholds -= (self.threshold_stage1 * np.e**(-self.gamma*count_events)) * estimate_labelshift_ratio((similarities[:event_dim+1] > self.threshold_stage1).int().cpu().numpy(), similarities[:event_dim+1].cpu().numpy(), 
+            thresholds -= (self.threshold_stage1 * np.e**(-self.gamma*count_events)) * estimate_labelshift_ratio((similarities[:event_dim+1].cpu().numpy() > thresholds)*1, similarities[:event_dim+1].cpu().numpy(), 
                                                              np.expand_dims(similarities[event_dim + 1].cpu().numpy(), 0), len(labels))
       
             
