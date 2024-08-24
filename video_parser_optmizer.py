@@ -35,14 +35,14 @@ class VideoParserOptimizer():
 
     def optimize(self, similarities, decord_vr, waveform_and_sr, labels, video_id, similarity_type):
         image_events_dict = {}
-        thresholds = np.full(len(labels), self.threshold_stage1)
+        thresholds = np.full((similarities.shape[0], len(labels)), self.threshold_stage1)
         count_events = np.zeros(len(labels))
         for event_dim in range(similarities.shape[0] - 1):
             tensor_slice_np = similarities[event_dim].cpu().numpy()
-            indices = np.where(tensor_slice_np > thresholds)[0]
+            indices = np.where(tensor_slice_np > thresholds[event_dim])[0]
             events = [labels[i] for i in indices]
             count_events[indices] += 1
-            thresholds -= (self.threshold_stage1 * np.e**(-self.gamma*count_events)) * estimate_labelshift_ratio((similarities[:event_dim+1].cpu().numpy() > thresholds)*1, similarities[:event_dim+1].cpu().numpy(), 
+            thresholds[event_dim + 1] -= (self.threshold_stage1 * np.e**(-self.gamma*count_events)) * estimate_labelshift_ratio((similarities[:event_dim+1].cpu().numpy() > thresholds[:event_dim+1])*1, similarities[:event_dim+1].cpu().numpy(), 
                                                              np.expand_dims(similarities[event_dim + 1].cpu().numpy(), 0), len(labels))
       
             
@@ -52,7 +52,7 @@ class VideoParserOptimizer():
 
 
         tensor_slice_np = similarities[len(similarities) - 1].cpu().numpy()
-        indices = np.where(tensor_slice_np > thresholds)[0]
+        indices = np.where(tensor_slice_np > thresholds[len(similarities) - 1])[0]
         events = [labels[i] for i in indices]
         image_events_dict[f"frame-{len(similarities) - 1}"] = events
 
