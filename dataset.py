@@ -12,7 +12,8 @@ decord.bridge.set_bridge('torch')
 class LLP(Dataset):
     def __init__(self, video_dir_path, audio_dir_path,
                  video_file_extension = ".mp4", 
-                 audio_file_extension = ".wav") -> None:
+                 audio_file_extension = ".wav",
+                 subset = None) -> None:
         
         self.video_dir_path = video_dir_path
         self.audio_dir_path = audio_dir_path
@@ -21,7 +22,9 @@ class LLP(Dataset):
         self.videos_ids = [video_id.replace(".mp4", "") for video_id in os.listdir(video_dir_path) 
                            if os.path.splitext(os.path.join(self.video_dir_path, video_id))[1] == '.mp4']
 
-        
+        if subset is not None:
+            self.videos_ids = [video_id for video_id in self.videos_ids if video_id in subset]
+
     def __len__(self):
         return len(self.videos_ids)
 

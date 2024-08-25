@@ -2,7 +2,7 @@ import json
 from dataset import LLP
 from tqdm import tqdm
 import argparse
-from eval_metrics import calculate_metrices, print_metrices
+from eval_metrics import calculate_metrices_LLP, calculate_metrices_AVE, print_metrices
 from models.languagebindmodel.languagebind import LanguageBind, LanguageBindImageTokenizer, to_device
 from video_parser_optmizer import VideoParserOptimizer
 
@@ -18,8 +18,7 @@ if __name__ == '__main__':
     parser.add_argument('--gamma', default=0.8, type=float)
     parser.add_argument('--candidates_file_path', required=True, type=str)
     parser.add_argument('--sample_audio_sec', default=2, type=int)
-    parser.add_argument('--output_video_path', default="./cropped_files/cropped_video.mp4", type=str)
-    parser.add_argument('--output_audio_path', default="./cropped_files/cropped_audio.wav", type=str)
+    parser.add_argument('--dataset', default='LLP', type=str, choices=['LLP', 'OOD'])
     args = parser.parse_args()
 
     threshold_stage1 = args.threshold_stage1
@@ -29,19 +28,29 @@ if __name__ == '__main__':
     alpha = args.alpha
     gamma = args.gamma
     video_dir_path = args.video_dir_path
-    output_video_path = args.output_video_path
-    output_audio_path = args.output_audio_path
     
+    if args.dataset == "LLP":
+        labels = ['Speech', 'Car', 'Cheering', 'Dog', 'Cat', 'Frying_(food)',
+                    'Basketball_bounce', 'Fire_alarm', 'Chainsaw', 'Cello', 'Banjo',
+                    'Singing', 'Chicken_rooster', 'Violin_fiddle', 'Vacuum_cleaner',
+                    'Baby_laughter', 'Accordion', 'Lawn_mower', 'Motorcycle', 'Helicopter',
+                    'Acoustic_guitar', 'Telephone_bell_ringing', 'Baby_cry_infant_cry', 'Blender',
+                    'Clapping']
+        subset = None
+
+    elif args.dataset == "OOD":
+        with open("./ood_dataset.json", 'r') as f:
+            subset = json.load(f)
+
+        labels = []
+        for k, v in subset.items():
+            labels.extend([sample['class'] for sample in v])
+        
+        labels = list(set(labels))
+
     dataset = LLP(args.video_dir_path,
-                  args.audio_dir_path)
-    
-    
-    labels = ['Speech', 'Car', 'Cheering', 'Dog', 'Cat', 'Frying_(food)',
-                  'Basketball_bounce', 'Fire_alarm', 'Chainsaw', 'Cello', 'Banjo',
-                  'Singing', 'Chicken_rooster', 'Violin_fiddle', 'Vacuum_cleaner',
-                  'Baby_laughter', 'Accordion', 'Lawn_mower', 'Motorcycle', 'Helicopter',
-                  'Acoustic_guitar', 'Telephone_bell_ringing', 'Baby_cry_infant_cry', 'Blender',
-                  'Clapping']
+                  args.audio_dir_path,
+                  subset=subset)
 
     device = f"cuda:{args.gpu_id}" if args.gpu_id != -1 else "cpu"
 
@@ -77,4 +86,8 @@ if __name__ == '__main__':
     with open(args.candidates_file_path, 'w') as f:
         json.dump(predictions, f)
 
-    print_metrices(calculate_metrices(args.video_dir_path, predictions, labels))
+    if args.dataset == "LLP":
+        print_metrices(calculate_metrices_LLP(args.video_dir_path, predictions, labels))
+    elif args.dataset == "OOD":
+        print_metrices(calculate_metrices_AVE(predictions, labels, subset))
+
