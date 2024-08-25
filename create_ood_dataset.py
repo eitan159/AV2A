@@ -18,6 +18,20 @@ ave_classes = list({sample.split("&")[0].lower() for sample in ave_data})
 
 intsection_classes = (set(ave_classes) & set(llp_classes)).union({'baby cry, infant cry', 'violin, fiddle'})
 
+ave_class2llp_class = {
+    'baby cry, infant cry': 'Baby_cry_infant_cry',
+    'violin, fiddle': 'Violin_fiddle',
+    'banjo': 'Banjo',
+    'helicopter': 'Helicopter',
+    'motorcycle': 'Motorcycle',
+    'frying (food)': 'Frying_(food)',
+    'acoustic guitar': 'Acoustic_guitar',
+    'cat': 'Cat',
+    'accordion': 'Accordion',
+    'chainsaw': 'Chainsaw'
+}
+
+
 ave_files_intescted_classes = []
 for sample in ave_data:
     sample = sample.split("&")
@@ -38,6 +52,7 @@ for sample in ave_data:
             final_filenames[sample[1]] = []
         class_count[sample[0].replace("_", " ").lower()] += 1
         final_filenames[sample[1]].append({'class': sample[0].replace("_", " ").lower(),
+                                           'llp_class': ave_class2llp_class[sample[0].replace("_", " ").lower()],
                                            'start': int(sample[3]),
                                            'end': int(sample[4])})
 

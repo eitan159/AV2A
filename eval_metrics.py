@@ -34,27 +34,27 @@ def F1(X_pre, X_gt):
         p += 2*np.sum(x * y) / (np.sum(x) + np.sum(y))
     return p/N
 
-def event_level(SO_a, SO_v, SO_av, GT_a, GT_v, GT_av):
+def event_level(SO_a, SO_v, SO_av, GT_a, GT_v, GT_av, N=25):
     # extract events
-    N = 25
-    event_p_a = [None for n in range(25)]
-    event_gt_a = [None for n in range(25)]
-    event_p_v = [None for n in range(25)]
-    event_gt_v = [None for n in range(25)]
-    event_p_av = [None for n in range(25)]
-    event_gt_av = [None for n in range(25)]
+    # N = 25
+    event_p_a = [None for n in range(N)]
+    event_gt_a = [None for n in range(N)]
+    event_p_v = [None for n in range(N)]
+    event_gt_v = [None for n in range(N)]
+    event_p_av = [None for n in range(N)]
+    event_gt_av = [None for n in range(N)]
 
-    TP_a = np.zeros(25)
-    TP_v = np.zeros(25)
-    TP_av = np.zeros(25)
+    TP_a = np.zeros(N)
+    TP_v = np.zeros(N)
+    TP_av = np.zeros(N)
 
-    FP_a = np.zeros(25)
-    FP_v = np.zeros(25)
-    FP_av = np.zeros(25)
+    FP_a = np.zeros(N)
+    FP_v = np.zeros(N)
+    FP_av = np.zeros(N)
 
-    FN_a = np.zeros(25)
-    FN_v = np.zeros(25)
-    FN_av = np.zeros(25)
+    FN_a = np.zeros(N)
+    FN_v = np.zeros(N)
+    FN_av = np.zeros(N)
 
     for n in range(N):
         seq_pred = SO_a[n, :]
@@ -441,7 +441,7 @@ def calculate_metrices_AVE(pred, categories, subset):
         F_seg_av.append(f_av)
 
         # event-level F1 scores
-        f_a, f_v, f, f_av = event_level(SO_a, SO_v, SO_av, GT_a, GT_v, GT_av)
+        f_a, f_v, f, f_av = event_level(SO_a, SO_v, SO_av, GT_a, GT_v, GT_av, N=len(categories))
         F_event_a.append(f_a)
         F_event_v.append(f_v)
         F_event.append(f)
@@ -482,20 +482,36 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--video_dir_path', required=True, type=str)
     parser.add_argument('--predictions_json_file_path', required=True, type=str)
+    parser.add_argument('--dataset', default='LLP', type=str, choices=['LLP', 'OOD'])
     args = parser.parse_args()
 
-    categories = ['Speech', 'Car', 'Cheering', 'Dog', 'Cat', 'Frying_(food)',
-                  'Basketball_bounce', 'Fire_alarm', 'Chainsaw', 'Cello', 'Banjo',
-                  'Singing', 'Chicken_rooster', 'Violin_fiddle', 'Vacuum_cleaner',
-                  'Baby_laughter', 'Accordion', 'Lawn_mower', 'Motorcycle', 'Helicopter',
-                  'Acoustic_guitar', 'Telephone_bell_ringing', 'Baby_cry_infant_cry', 'Blender',
-                  'Clapping']
+    if args.dataset == "LLP":
+        categories = ['Speech', 'Car', 'Cheering', 'Dog', 'Cat', 'Frying_(food)',
+                    'Basketball_bounce', 'Fire_alarm', 'Chainsaw', 'Cello', 'Banjo',
+                    'Singing', 'Chicken_rooster', 'Violin_fiddle', 'Vacuum_cleaner',
+                    'Baby_laughter', 'Accordion', 'Lawn_mower', 'Motorcycle', 'Helicopter',
+                    'Acoustic_guitar', 'Telephone_bell_ringing', 'Baby_cry_infant_cry', 'Blender',
+                    'Clapping']
     
+    elif args.dataset == "OOD":
+        with open("./ood_dataset.json", 'r') as f:
+            subset = json.load(f)
+
+        categories = []
+        for k, v in subset.items():
+            for sample in v:
+                if sample['class'] not in categories:
+                    categories.append(sample['class'])
+        
+        
     with open(args.predictions_json_file_path, 'r') as f:
         pred = json.load(f)
 
-    print_metrices(calculate_metrices_LLP(args.video_dir_path, pred, categories))
-    
+    #print_metrices(calculate_metrices_LLP(args.video_dir_path, pred, categories))
+    if args.dataset == "LLP":
+        print_metrices(calculate_metrices_LLP(args.video_dir_path, pred, categories))
+    elif args.dataset == "OOD":
+        print_metrices(calculate_metrices_AVE(pred, categories, subset))
             
 
 
