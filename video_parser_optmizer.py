@@ -5,8 +5,9 @@ from data_transforms import VisionTransform, AudioTransform
 from label_shift import estimate_labelshift_ratio
 
 class VideoParserOptimizer():
-    def __init__(self, model, tokenizer, labels, device, sample_audio_sec, alpha, 
+    def __init__(self, method, model, tokenizer, labels, device, sample_audio_sec, alpha, 
                  filter_threshold, threshold_stage1, threshold_stage2, gamma) -> None:
+        self.method = method
         self.model = model
         self.tokenizer = tokenizer
         self.labels = labels
@@ -41,10 +42,11 @@ class VideoParserOptimizer():
             tensor_slice_np = similarities[event_dim].cpu().numpy()
             indices = np.where(tensor_slice_np > thresholds[event_dim])[0]
             events = [labels[i] for i in indices]
-            count_events[indices] += 1
-            thresholds[event_dim + 1] -= (self.threshold_stage1 * np.e**(-self.gamma*count_events)) * estimate_labelshift_ratio((similarities[:event_dim+1].cpu().numpy() > thresholds[:event_dim+1])*1, similarities[:event_dim+1].cpu().numpy(), 
-                                                             np.expand_dims(similarities[event_dim + 1].cpu().numpy(), 0), len(labels))
-      
+            if self.method == "BBSE":
+                count_events[indices] += 1
+                thresholds[event_dim + 1] -= (self.threshold_stage1 * np.e**(-self.gamma*count_events)) * estimate_labelshift_ratio((similarities[:event_dim+1].cpu().numpy() > thresholds[:event_dim+1])*1, similarities[:event_dim+1].cpu().numpy(), 
+                                                                np.expand_dims(similarities[event_dim + 1].cpu().numpy(), 0), len(labels))
+        
             
             # labelshift_ratio = estimate_labelshift_ratio(np.expand_dims((tensor_slice_np > self.threshold_stage1)*1, 0), np.expand_dims(tensor_slice_np, 0), 
             #                                                  np.expand_dims(similarities[event_dim + 1].cpu().numpy(), 0), len(labels))

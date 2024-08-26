@@ -19,6 +19,7 @@ if __name__ == '__main__':
     parser.add_argument('--candidates_file_path', required=True, type=str)
     parser.add_argument('--sample_audio_sec', default=2, type=int)
     parser.add_argument('--dataset', default='LLP', type=str, choices=['LLP', 'OOD'])
+    parser.add_argument('--method', default='BBSE', type=str)
     args = parser.parse_args()
 
     threshold_stage1 = args.threshold_stage1
@@ -67,7 +68,7 @@ if __name__ == '__main__':
     tokenizer = LanguageBindImageTokenizer.from_pretrained(pretrained_ckpt, cache_dir='./cache_dir/tokenizer_cache_dir')
     # modality_transform = {c: transform_dict[c](model.modality_config[c]) for c in clip_type.keys()}
 
-    model = VideoParserOptimizer(model, tokenizer, labels, device, args.sample_audio_sec, alpha, 
+    model = VideoParserOptimizer(args.method, model, tokenizer, labels, device, args.sample_audio_sec, alpha, 
                             filter_threshold, threshold_stage1, threshold_stage2, gamma)
 
     combined_candidates, video_candidates, audio_candidates = [], [], []
