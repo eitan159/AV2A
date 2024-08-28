@@ -401,6 +401,31 @@ def calculate_metrices_LLP(video_dir_path, pred, categories, split="test"):
 
     return metrices
 
+def calculate_ave_acc(pred, categories, subset):
+    total_acc = 0
+    total_num = 0
+    id_to_idx = {id: index for index, id in enumerate(categories)}
+    pred_combined = {list(d.keys())[0]: list(d.values())[0] for d in pred["combined"]}
+    for file_name, v in subset.items():
+        GT = np.zeros(10)
+        pred = np.zeros(10)
+        v = v[0]
+        x1 = v['start']
+        x2 = v['end']
+        GT[x1:x2] = id_to_idx[v['class']] + 1
+        
+        if pred_combined[file_name] != []:
+            for pred_dict in pred_combined[file_name]: 
+                cls_idx, x1, x2 = id_to_idx[pred_dict["event_label"]] + 1, pred_dict["start"], pred_dict["end"]
+                pred[x1: x2] = cls_idx
+                total_acc += (pred == GT).sum()
+                total_num += 10
+        else:
+            total_acc += (pred == GT).sum()
+            total_num += 10
+
+    print(f"AVE Acc: {total_acc / total_num * 100}")
+
 def calculate_metrices_AVE(pred, categories, subset):
     id_to_idx = {id: index for index, id in enumerate(categories)}
     
@@ -416,12 +441,12 @@ def calculate_metrices_AVE(pred, categories, subset):
     F_event_av = []
     for file_name, v  in subset.items():
 
-        SO_a = np.zeros((len(categories), 10))
-        SO_v = np.zeros((len(categories), 10))
-        SO_av = np.zeros((len(categories), 10))
-        GT_a = np.zeros((len(categories), 10))
-        GT_v = np.zeros((len(categories), 10))
-        GT_av = np.zeros((len(categories), 10))
+        SO_a = np.zeros((25, 10))
+        SO_v = np.zeros((25, 10))
+        SO_av = np.zeros((25, 10))
+        GT_a = np.zeros((25, 10))
+        GT_v = np.zeros((25, 10))
+        GT_av = np.zeros((25, 10))
 
         for sample in v:
             x1 = sample['start']
@@ -441,7 +466,7 @@ def calculate_metrices_AVE(pred, categories, subset):
         F_seg_av.append(f_av)
 
         # event-level F1 scores
-        f_a, f_v, f, f_av = event_level(SO_a, SO_v, SO_av, GT_a, GT_v, GT_av, N=len(categories))
+        f_a, f_v, f, f_av = event_level(SO_a, SO_v, SO_av, GT_a, GT_v, GT_av)
         F_event_a.append(f_a)
         F_event_v.append(f_v)
         F_event.append(f)
@@ -482,7 +507,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--video_dir_path', required=True, type=str)
     parser.add_argument('--predictions_json_file_path', required=True, type=str)
-    parser.add_argument('--dataset', default='LLP', type=str, choices=['LLP', 'OOD'])
+    parser.add_argument('--dataset', default='LLP', type=str, choices=['LLP', 'AVE'])
     args = parser.parse_args()
 
     if args.dataset == "LLP":
@@ -493,8 +518,8 @@ if __name__ == '__main__':
                     'Acoustic_guitar', 'Telephone_bell_ringing', 'Baby_cry_infant_cry', 'Blender',
                     'Clapping']
     
-    elif args.dataset == "OOD":
-        with open("./ood_dataset.json", 'r') as f:
+    elif args.dataset == "AVE":
+        with open("./test_AVE.json", 'r') as f:
             subset = json.load(f)
 
         categories = []
@@ -510,7 +535,8 @@ if __name__ == '__main__':
     #print_metrices(calculate_metrices_LLP(args.video_dir_path, pred, categories))
     if args.dataset == "LLP":
         print_metrices(calculate_metrices_LLP(args.video_dir_path, pred, categories))
-    elif args.dataset == "OOD":
+    elif args.dataset == "AVE":
+        print(calculate_ave_acc(pred, categories, subset))
         print_metrices(calculate_metrices_AVE(pred, categories, subset))
             
 

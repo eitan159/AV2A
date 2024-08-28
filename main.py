@@ -2,7 +2,7 @@ import json
 from dataset import LLP
 from tqdm import tqdm
 import argparse
-from eval_metrics import calculate_metrices_LLP, calculate_metrices_AVE, print_metrices
+from eval_metrics import calculate_metrices_LLP, calculate_metrices_AVE, print_metrices, calculate_ave_acc
 from models.languagebindmodel.languagebind import LanguageBind, LanguageBindImageTokenizer, to_device
 from video_parser_optmizer import VideoParserOptimizer
 
@@ -18,8 +18,10 @@ if __name__ == '__main__':
     parser.add_argument('--gamma', default=0.8, type=float)
     parser.add_argument('--candidates_file_path', required=True, type=str)
     parser.add_argument('--sample_audio_sec', default=2, type=int)
-    parser.add_argument('--dataset', default='LLP', type=str, choices=['LLP', 'OOD'])
+    parser.add_argument('--dataset', default='LLP', type=str, choices=['LLP', 'AVE'])
     parser.add_argument('--method', default='BBSE', type=str)
+    parser.add_argument('--without_filter_classes', action="store_true")
+    parser.add_argument('--without_refine_segments', action="store_true")
     args = parser.parse_args()
 
     threshold_stage1 = args.threshold_stage1
@@ -39,8 +41,8 @@ if __name__ == '__main__':
                     'Clapping']
         subset = None
 
-    elif args.dataset == "OOD":
-        with open("./ood_dataset.json", 'r') as f:
+    elif args.dataset == "AVE":
+        with open("./test_AVE.json", 'r') as f:
             subset = json.load(f)
 
         labels = []
@@ -69,7 +71,8 @@ if __name__ == '__main__':
     # modality_transform = {c: transform_dict[c](model.modality_config[c]) for c in clip_type.keys()}
 
     model = VideoParserOptimizer(args.method, model, tokenizer, labels, device, args.sample_audio_sec, alpha, 
-                            filter_threshold, threshold_stage1, threshold_stage2, gamma)
+                            filter_threshold, threshold_stage1, threshold_stage2, gamma, args.without_filter_classes,
+                            args.without_refine_segments)
 
     combined_candidates, video_candidates, audio_candidates = [], [], []
     for sample in tqdm(dataset, desc="Processing samples"):
@@ -89,6 +92,7 @@ if __name__ == '__main__':
 
     if args.dataset == "LLP":
         print_metrices(calculate_metrices_LLP(args.video_dir_path, predictions, labels))
-    elif args.dataset == "OOD":
+    elif args.dataset == "AVE":
+        print(calculate_ave_acc(predictions, labels, subset))
         print_metrices(calculate_metrices_AVE(predictions, labels, subset))
 

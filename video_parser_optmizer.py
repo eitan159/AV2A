@@ -6,7 +6,8 @@ from label_shift import estimate_labelshift_ratio
 
 class VideoParserOptimizer():
     def __init__(self, method, model, tokenizer, labels, device, sample_audio_sec, alpha, 
-                 filter_threshold, threshold_stage1, threshold_stage2, gamma) -> None:
+                 filter_threshold, threshold_stage1, threshold_stage2, gamma, without_filter_classes,
+                 without_refine_segments) -> None:
         self.method = method
         self.model = model
         self.tokenizer = tokenizer
@@ -21,6 +22,10 @@ class VideoParserOptimizer():
         self.threshold_stage2 = threshold_stage2
         self.filter_threshold = filter_threshold
         self.gamma = gamma
+
+        self.without_filter_classes = without_filter_classes
+        self.without_refine_segments = without_refine_segments
+
         
     def convert_results(self, results, video_id):
         coverted_results = []
@@ -63,12 +68,17 @@ class VideoParserOptimizer():
         results = self.increment_end_times(results)
         results = self.merge_consecutive_segments(results)
         results = self.filter_events(results)
-        results = self.refine_segments(results, decord_vr, waveform_and_sr, labels, similarity_type)
+        
+        if not self.without_refine_segments:
+            results = self.refine_segments(results, decord_vr, waveform_and_sr, labels, similarity_type)
         
         return self.convert_results(results, video_id)
 
     def predict(self, labels, decord_vr, waveform_and_sr, video_id):
-        combined_filtered_labels, video_filtered_labels, audio_filtered_labels = self.filter_classes(labels, decord_vr, waveform_and_sr, self.filter_threshold)
+        if not self.without_filter_classes:
+            combined_filtered_labels, video_filtered_labels, audio_filtered_labels = self.filter_classes(labels, decord_vr, waveform_and_sr, self.filter_threshold)
+        else:
+            combined_filtered_labels, video_filtered_labels, audio_filtered_labels = labels, labels, labels
         
         inputs = {
             'image': {"pixel_values": self.vision_transforms(decord_vr, transform_type='image').to(self.device)},
