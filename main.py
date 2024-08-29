@@ -72,7 +72,7 @@ if __name__ == '__main__':
 
     model = VideoParserOptimizer(args.method, model, tokenizer, labels, device, args.sample_audio_sec, alpha, 
                             filter_threshold, threshold_stage1, threshold_stage2, gamma, args.without_filter_classes,
-                            args.without_refine_segments)
+                            args.without_refine_segments, args.dataset)
 
     combined_candidates, video_candidates, audio_candidates = [], [], []
     for sample in tqdm(dataset, desc="Processing samples"):

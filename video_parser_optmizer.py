@@ -7,7 +7,7 @@ from label_shift import estimate_labelshift_ratio
 class VideoParserOptimizer():
     def __init__(self, method, model, tokenizer, labels, device, sample_audio_sec, alpha, 
                  filter_threshold, threshold_stage1, threshold_stage2, gamma, without_filter_classes,
-                 without_refine_segments) -> None:
+                 without_refine_segments, dataset) -> None:
         self.method = method
         self.model = model
         self.tokenizer = tokenizer
@@ -25,7 +25,7 @@ class VideoParserOptimizer():
 
         self.without_filter_classes = without_filter_classes
         self.without_refine_segments = without_refine_segments
-
+        self.dataset = dataset
         
     def convert_results(self, results, video_id):
         coverted_results = []
@@ -179,13 +179,22 @@ class VideoParserOptimizer():
                     combined_similarities, video_text_similarties, audio_text_similarties = self.get_similiraties(labels, inputs, self.alpha)
                     
                     if similarity_type == "combined":
-                        events = self.events_above_threshold(labels, combined_similarities, self.threshold_stage2)
+                        if self.dataset == "AVE":
+                            events = [labels[combined_similarities.argmax().item()]]
+                        else:    
+                            events = self.events_above_threshold(labels, combined_similarities, self.threshold_stage2)
                         similarities = combined_similarities[0]
                     elif similarity_type == "video":
-                        events = self.events_above_threshold(labels, video_text_similarties, self.threshold_stage2)
+                        if self.dataset == "AVE":
+                            events = [labels[video_text_similarties.argmax().item()]]
+                        else:  
+                            events = self.events_above_threshold(labels, video_text_similarties, self.threshold_stage2)
                         similarities = video_text_similarties[0]
                     else:
-                        events = self.events_above_threshold(labels, audio_text_similarties, self.threshold_stage2)
+                        if self.dataset == "AVE":
+                            events = [labels[audio_text_similarties.argmax().item()]]
+                        else:  
+                            events = self.events_above_threshold(labels, audio_text_similarties, self.threshold_stage2)
                         similarities = audio_text_similarties[0]
 
                     if event in events:
