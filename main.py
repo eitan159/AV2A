@@ -14,7 +14,7 @@ if __name__ == '__main__':
     parser.add_argument('--threshold_stage1', default=0.6, type=float)
     parser.add_argument('--threshold_stage2', default=0.6, type=float)
     parser.add_argument('--filter_threshold', default=0.5, type=float)
-    parser.add_argument('--alpha', default=0.4, type=float)
+    parser.add_argument('--alpha', default=0.5, type=float)
     parser.add_argument('--gamma', default=0.8, type=float)
     parser.add_argument('--candidates_file_path', required=True, type=str)
     parser.add_argument('--sample_audio_sec', default=2, type=int)

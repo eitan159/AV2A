@@ -415,11 +415,12 @@ def calculate_ave_acc(pred, categories, subset):
         GT[x1:x2] = id_to_idx[v['class']] + 1
         
         if pred_combined[file_name] != []:
-            for pred_dict in pred_combined[file_name]: 
-                cls_idx, x1, x2 = id_to_idx[pred_dict["event_label"]] + 1, pred_dict["start"], pred_dict["end"]
-                pred[x1: x2] = cls_idx
-                total_acc += (pred == GT).sum()
-                total_num += 10
+            #for pred_dict in pred_combined[file_name]: 
+            pred_dict = pred_combined[file_name][0]
+            cls_idx, x1, x2 = id_to_idx[pred_dict["event_label"]] + 1, pred_dict["start"], pred_dict["end"]
+            pred[x1: x2] = cls_idx
+            total_acc += (pred == GT).sum()
+            total_num += 10
         else:
             total_acc += (pred == GT).sum()
             total_num += 10
