@@ -40,7 +40,36 @@ if __name__ == '__main__':
                     'Acoustic_guitar', 'Telephone_bell_ringing', 'Baby_cry_infant_cry', 'Blender',
                     'Clapping']
         subset = None
-
+        if alpha == -1:
+            label_values = {
+                'Speech': 0.2,              # Mostly heard but can see people talking
+                'Car': 0.8,                 # Mostly seen, sound of car can be heard too
+                'Cheering': 0.1,            # Mostly heard, visual context exists but secondary
+                'Dog': 0.7,                 # Mostly seen, barking or other sounds are audible
+                'Cat': 0.7,                 # Mostly seen, meowing can be heard
+                'Frying_(food)': 0.4,       # Can hear sizzling sound, visual is secondary
+                'Basketball_bounce': 0.6,   # Can see the ball bounce, sound is secondary
+                'Fire_alarm': 0.0,          # Mostly heard
+                'Chainsaw': 0.2,            # Mostly heard but also visible
+                'Cello': 0.1,               # Mostly heard, playing seen but secondary
+                'Banjo': 0.1,               # Mostly heard, playing seen but secondary
+                'Singing': 0.1,             # Mostly heard, visual aspect is secondary
+                'Chicken_rooster': 0.7,     # Mostly seen, crowing can be heard
+                'Violin_fiddle': 0.1,       # Mostly heard, visual context exists but secondary
+                'Vacuum_cleaner': 0.2,      # Mostly heard, seen but less important
+                'Baby_laughter': 0.1,       # Mostly heard, some visual context
+                'Accordion': 0.1,           # Mostly heard, playing seen but secondary
+                'Lawn_mower': 0.3,          # Mostly heard, can be seen but secondary
+                'Motorcycle': 0.8,          # Mostly seen, sound heard
+                'Helicopter': 0.7,          # Mostly seen, sound is secondary
+                'Acoustic_guitar': 0.1,     # Mostly heard, playing seen but secondary
+                'Telephone_bell_ringing': 0.0,  # Mostly heard
+                'Baby_cry_infant_cry': 0.1, # Mostly heard, visual context is secondary
+                'Blender': 0.2,             # Mostly heard, can be seen but secondary
+                'Clapping': 0.2             # Mostly heard, some visual context
+            }
+            alpha = list(label_values.values())
+            
     elif args.dataset == "AVE":
         with open("./test_AVE.json", 'r') as f:
             subset = json.load(f)
