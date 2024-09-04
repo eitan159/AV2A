@@ -5,6 +5,7 @@ import argparse
 from eval_metrics import calculate_metrices_LLP, calculate_metrices_AVE, print_metrices, calculate_ave_acc
 from models.languagebindmodel.languagebind import LanguageBind, LanguageBindImageTokenizer, to_device
 from video_parser_optmizer import VideoParserOptimizer
+import torch
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -32,6 +33,8 @@ if __name__ == '__main__':
     gamma = args.gamma
     video_dir_path = args.video_dir_path
     
+    device = f"cuda:{args.gpu_id}" if args.gpu_id != -1 else "cpu"
+
     if args.dataset == "LLP":
         labels = ['Speech', 'Car', 'Cheering', 'Dog', 'Cat', 'Frying_(food)',
                     'Basketball_bounce', 'Fire_alarm', 'Chainsaw', 'Cello', 'Banjo',
@@ -42,34 +45,34 @@ if __name__ == '__main__':
         subset = None
         if alpha == -1:
             label_values = {
-                'Speech': 0.2,              # Mostly heard but can see people talking
-                'Car': 0.8,                 # Mostly seen, sound of car can be heard too
-                'Cheering': 0.1,            # Mostly heard, visual context exists but secondary
-                'Dog': 0.7,                 # Mostly seen, barking or other sounds are audible
-                'Cat': 0.7,                 # Mostly seen, meowing can be heard
-                'Frying_(food)': 0.4,       # Can hear sizzling sound, visual is secondary
-                'Basketball_bounce': 0.6,   # Can see the ball bounce, sound is secondary
-                'Fire_alarm': 0.0,          # Mostly heard
-                'Chainsaw': 0.2,            # Mostly heard but also visible
-                'Cello': 0.1,               # Mostly heard, playing seen but secondary
-                'Banjo': 0.1,               # Mostly heard, playing seen but secondary
-                'Singing': 0.1,             # Mostly heard, visual aspect is secondary
-                'Chicken_rooster': 0.7,     # Mostly seen, crowing can be heard
-                'Violin_fiddle': 0.1,       # Mostly heard, visual context exists but secondary
-                'Vacuum_cleaner': 0.2,      # Mostly heard, seen but less important
-                'Baby_laughter': 0.1,       # Mostly heard, some visual context
-                'Accordion': 0.1,           # Mostly heard, playing seen but secondary
-                'Lawn_mower': 0.3,          # Mostly heard, can be seen but secondary
-                'Motorcycle': 0.8,          # Mostly seen, sound heard
-                'Helicopter': 0.7,          # Mostly seen, sound is secondary
-                'Acoustic_guitar': 0.1,     # Mostly heard, playing seen but secondary
-                'Telephone_bell_ringing': 0.0,  # Mostly heard
-                'Baby_cry_infant_cry': 0.1, # Mostly heard, visual context is secondary
-                'Blender': 0.2,             # Mostly heard, can be seen but secondary
-                'Clapping': 0.2             # Mostly heard, some visual context
-            }
-            alpha = list(label_values.values())
-            
+                'Speech': 0.3,              # Primarily heard but you can see someone speaking
+                'Car': 0.7,                 # Primarily seen, but the sound of a car can also be heard
+                'Cheering': 0.4,            # Primarily heard, but can see the crowd
+                'Dog': 0.6,                 # Primarily seen, but you can also hear barking or other sounds
+                'Cat': 0.6,                 # Primarily seen, but meowing can be heard
+                'Frying_(food)': 0.4,       # Mostly heard (sizzling), but you can also see the food being fried
+                'Basketball_bounce': 0.5,   # Can hear the bounce and see it happen
+                'Fire_alarm': 0.2,          # Primarily heard, but can be seen flashing or installed
+                'Chainsaw': 0.4,            # Primarily heard, but can be seen in action
+                'Cello': 0.3,               # Primarily heard, but you can also see the player and instrument
+                'Banjo': 0.3,               # Primarily heard, but can be seen played
+                'Singing': 0.3,             # Primarily heard, but can see the person singing
+                'Chicken_rooster': 0.5,     # Can see the rooster and hear it crow
+                'Violin_fiddle': 0.3,       # Primarily heard, but can also see the player
+                'Vacuum_cleaner': 0.4,      # Mostly heard (vacuum sound), but can also see the machine
+                'Baby_laughter': 0.3,       # Primarily heard, but the baby can be seen
+                'Accordion': 0.3,           # Primarily heard, but can see it being played
+                'Lawn_mower': 0.5,          # Primarily heard, but can also be seen in use
+                'Motorcycle': 0.6,          # Primarily seen, but can also be heard
+                'Helicopter': 0.6,          # Primarily seen, but can also be heard
+                'Acoustic_guitar': 0.3,     # Primarily heard, but can see the player and instrument
+                'Telephone_bell_ringing': 0.2,  # Primarily heard, but you can see the phone ring
+                'Baby_cry_infant_cry': 0.3, # Primarily heard, but you can see the baby
+                'Blender': 0.4,             # Primarily heard, but can see the blender in action
+                'Clapping': 0.4             # Primarily heard, but you can also see people clapping
+            }            
+            alpha = torch.as_tensor(list((label_values.values()))).to(device)
+
     elif args.dataset == "AVE":
         with open("./test_AVE.json", 'r') as f:
             subset = json.load(f)
@@ -83,8 +86,6 @@ if __name__ == '__main__':
     dataset = LLP(args.video_dir_path,
                   args.audio_dir_path,
                   subset=subset)
-
-    device = f"cuda:{args.gpu_id}" if args.gpu_id != -1 else "cpu"
 
     clip_type = {
         'video': 'LanguageBind_Video_FT', 
