@@ -3,7 +3,7 @@ from dataset import LLP
 from models.languagebindmodel.languagebind import LanguageBind, LanguageBindImageTokenizer
 from eval_metrics import calculate_metrices
 from video_parser_optmizer import VideoParserOptimizer
-
+import torch
 
 def sweep():
     dataset = LLP(video_dir_path, audio_dir_path)
@@ -14,6 +14,36 @@ def sweep():
                   'Baby_laughter', 'Accordion', 'Lawn_mower', 'Motorcycle', 'Helicopter',
                   'Acoustic_guitar', 'Telephone_bell_ringing', 'Baby_cry_infant_cry', 'Blender',
                   'Clapping']
+
+    if config.alpha == -1:
+        label_values = {
+                'Speech': 0.3,              # Primarily heard but you can see someone speaking
+                'Car': 0.7,                 # Primarily seen, but the sound of a car can also be heard
+                'Cheering': 0.4,            # Primarily heard, but can see the crowd
+                'Dog': 0.6,                 # Primarily seen, but you can also hear barking or other sounds
+                'Cat': 0.6,                 # Primarily seen, but meowing can be heard
+                'Frying_(food)': 0.4,       # Mostly heard (sizzling), but you can also see the food being fried
+                'Basketball_bounce': 0.5,   # Can hear the bounce and see it happen
+                'Fire_alarm': 0.2,          # Primarily heard, but can be seen flashing or installed
+                'Chainsaw': 0.4,            # Primarily heard, but can be seen in action
+                'Cello': 0.3,               # Primarily heard, but you can also see the player and instrument
+                'Banjo': 0.3,               # Primarily heard, but can be seen played
+                'Singing': 0.3,             # Primarily heard, but can see the person singing
+                'Chicken_rooster': 0.5,     # Can see the rooster and hear it crow
+                'Violin_fiddle': 0.3,       # Primarily heard, but can also see the player
+                'Vacuum_cleaner': 0.4,      # Mostly heard (vacuum sound), but can also see the machine
+                'Baby_laughter': 0.3,       # Primarily heard, but the baby can be seen
+                'Accordion': 0.3,           # Primarily heard, but can see it being played
+                'Lawn_mower': 0.5,          # Primarily heard, but can also be seen in use
+                'Motorcycle': 0.6,          # Primarily seen, but can also be heard
+                'Helicopter': 0.6,          # Primarily seen, but can also be heard
+                'Acoustic_guitar': 0.3,     # Primarily heard, but can see the player and instrument
+                'Telephone_bell_ringing': 0.2,  # Primarily heard, but you can see the phone ring
+                'Baby_cry_infant_cry': 0.3, # Primarily heard, but you can see the baby
+                'Blender': 0.4,             # Primarily heard, but can see the blender in action
+                'Clapping': 0.4             # Primarily heard, but you can also see people clapping
+            }            
+        config.alpha = torch.as_tensor(list((label_values.values()))).to(device)
 
     device = f"cuda:0"
 
