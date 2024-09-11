@@ -49,8 +49,10 @@ class VideoParserOptimizer():
             events = [labels[i] for i in indices]
             if self.method == "BBSE":
                 count_events[indices] += 1
-                thresholds[event_dim + 1] -= (self.threshold_stage1 * np.e**(-self.gamma*count_events)) * estimate_labelshift_ratio((similarities[:event_dim+1].cpu().numpy() > thresholds[:event_dim+1])*1, similarities[:event_dim+1].cpu().numpy(), 
+                offset = (self.threshold_stage1 * np.e**(-self.gamma*count_events)) * estimate_labelshift_ratio((similarities[:event_dim+1].cpu().numpy() > thresholds[:event_dim+1])*1, similarities[:event_dim+1].cpu().numpy(), 
                                                                 np.expand_dims(similarities[event_dim + 1].cpu().numpy(), 0), len(labels))
+                
+                thresholds[event_dim + 1] = thresholds[event_dim] - offset
         
             
             # labelshift_ratio = estimate_labelshift_ratio(np.expand_dims((tensor_slice_np > self.threshold_stage1)*1, 0), np.expand_dims(tensor_slice_np, 0), 
