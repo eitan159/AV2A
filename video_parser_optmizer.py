@@ -262,14 +262,11 @@ class VideoParserOptimizer():
         audio_text_similarity_norm = (audio_text_similarity - torch.mean(audio_text_similarity, dim=-1, keepdim=True)) / torch.std(audio_text_similarity, dim=-1, keepdim=True)
         audio_text_similarity_sigmoid_norm = torch.sigmoid(audio_text_similarity_norm)
 
-        if isinstance(alpha, torch.Tensor):
-            indicies = [self.labels.index(label) for label in labels]
-            combined_similarities = (1 - alpha[indicies]) * video_text_similarity_sigmoid_norm + (alpha[indicies]) * audio_text_similarity_sigmoid_norm
-        elif alpha > 0:
+        if alpha > 0:
             combined_similarities = (1 - alpha) * video_text_similarity_sigmoid_norm + (alpha) * audio_text_similarity_sigmoid_norm
         else:
-            w_v = video_text_similarity_sigmoid_norm / (video_text_similarity_sigmoid_norm + audio_text_similarity_sigmoid_norm)
-            combined_similarities = w_v * video_text_similarity_sigmoid_norm + (1 - w_v) * audio_text_similarity_sigmoid_norm
+            combined_similarities = video_text_similarity_sigmoid_norm * audio_text_similarity_sigmoid_norm
+
 
 
         return combined_similarities, video_text_similarity_sigmoid_norm, audio_text_similarity_sigmoid_norm
