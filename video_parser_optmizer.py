@@ -267,8 +267,6 @@ class VideoParserOptimizer():
         else:
             combined_similarities = video_text_similarity_sigmoid_norm * audio_text_similarity_sigmoid_norm
 
-
-
         return combined_similarities, video_text_similarity_sigmoid_norm, audio_text_similarity_sigmoid_norm
 
 
