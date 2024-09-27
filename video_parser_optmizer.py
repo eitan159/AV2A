@@ -5,7 +5,7 @@ from data_transforms import VisionTransform, AudioTransform
 from label_shift import estimate_labelshift_ratio
 
 class VideoParserOptimizer():
-    def __init__(self, method, model, tokenizer, labels, device, sample_audio_sec, alpha, 
+    def __init__(self, method, model, tokenizer, labels, device, sample_audio_sec, alpha,
                  filter_threshold, threshold_stage1, threshold_stage2, gamma, without_filter_classes,
                  without_refine_segments, dataset) -> None:
         self.method = method
@@ -39,7 +39,7 @@ class VideoParserOptimizer():
 
         return {video_id: coverted_results}
 
-    def optimize(self, similarities, decord_vr, waveform_and_sr, labels, video_id, similarity_type):
+    def optimize(self, similarities, decord_vr, waveform_and_sr, labels, video_id, similarity_type, embeddings):
         image_events_dict = {}
         thresholds = np.full((similarities.shape[0], len(labels)), self.threshold_stage1)
         count_events = np.zeros(len(labels))
@@ -49,14 +49,20 @@ class VideoParserOptimizer():
             events = [labels[i] for i in indices]
             if self.method == "BBSE":
                 count_events[indices] += 1
-                offset = (self.threshold_stage1 * np.e**(-self.gamma*count_events)) * estimate_labelshift_ratio((similarities[:event_dim+1].cpu().numpy() > thresholds[:event_dim+1])*1, similarities[:event_dim+1].cpu().numpy(), 
+                label_shift_ratio = estimate_labelshift_ratio((similarities[:event_dim+1].cpu().numpy() > thresholds[:event_dim+1])*1, similarities[:event_dim+1].cpu().numpy(), 
                                                                 np.expand_dims(similarities[event_dim + 1].cpu().numpy(), 0), len(labels))
-                
+
+                vector1 = embeddings['image'][event_dim].cpu().numpy()
+                vector2 = embeddings['image'][event_dim+1].cpu().numpy()
+
+                cosine_similarity = np.dot(vector1, vector2) / (np.linalg.norm(vector1) * np.linalg.norm(vector2))
+                cosine_similarity = np.clip(cosine_similarity, 0, 1)
+
+                offset = (self.threshold_stage1 * np.e**(-self.gamma*count_events)) * label_shift_ratio * cosine_similarity
+
                 thresholds[event_dim + 1] = thresholds[event_dim] - offset
         
             
-            # labelshift_ratio = estimate_labelshift_ratio(np.expand_dims((tensor_slice_np > self.threshold_stage1)*1, 0), np.expand_dims(tensor_slice_np, 0), 
-            #                                                  np.expand_dims(similarities[event_dim + 1].cpu().numpy(), 0), len(labels))
             image_events_dict[f"frame-{event_dim}"] = events
 
 
@@ -86,13 +92,13 @@ class VideoParserOptimizer():
             'image': {"pixel_values": self.vision_transforms(decord_vr, transform_type='image').to(self.device)},
             'audio': {"pixel_values": self.audio_transforms.split_sample_audio(waveform_and_sr, self.sample_audio_sec).to(self.device)},
         }
-        combined_similarities, _, _ = self.get_similiraties(combined_filtered_labels, inputs, self.alpha)
-        _, video_text_similarties, _ = self.get_similiraties(video_filtered_labels, inputs, self.alpha)
-        _, _, audio_text_similarites = self.get_similiraties(audio_filtered_labels, inputs, self.alpha)
+        combined_similarities, _, _, embeddings_combined = self.get_similiraties(combined_filtered_labels, inputs, self.alpha)
+        _, video_text_similarties, _, embeddings_video_text = self.get_similiraties(video_filtered_labels, inputs, self.alpha)
+        _, _, audio_text_similarites, embeddings_audio_text = self.get_similiraties(audio_filtered_labels, inputs, self.alpha)
 
-        combined_results = self.optimize(combined_similarities, decord_vr, waveform_and_sr, combined_filtered_labels, video_id, "combined")
-        video_results = self.optimize(video_text_similarties, decord_vr, waveform_and_sr, video_filtered_labels, video_id, "video")
-        audio_results = self.optimize(audio_text_similarites, decord_vr, waveform_and_sr, audio_filtered_labels, video_id, "audio")
+        combined_results = self.optimize(combined_similarities, decord_vr, waveform_and_sr, combined_filtered_labels, video_id, "combined", embeddings_combined)
+        video_results = self.optimize(video_text_similarties, decord_vr, waveform_and_sr, video_filtered_labels, video_id, "video", embeddings_video_text)
+        audio_results = self.optimize(audio_text_similarites, decord_vr, waveform_and_sr, audio_filtered_labels, video_id, "audio", embeddings_audio_text)
 
         return combined_results, video_results, audio_results
 
@@ -178,7 +184,7 @@ class VideoParserOptimizer():
                         'video': {"pixel_values": self.vision_transforms(decord_vr, transform_type='video', start=start_time, end=end_time).unsqueeze(0).to(self.device)},
                         'audio': {"pixel_values": self.audio_transforms(waveform_and_sr, start_sec=start_time, end_sec=end_time).unsqueeze(0).to(self.device)},
                     }
-                    combined_similarities, video_text_similarties, audio_text_similarties = self.get_similiraties(labels, inputs, self.alpha)
+                    combined_similarities, video_text_similarties, audio_text_similarties, _ = self.get_similiraties(labels, inputs, self.alpha)
                     
                     if similarity_type == "combined":
                         if self.dataset == "AVE":
@@ -267,7 +273,7 @@ class VideoParserOptimizer():
         else:
             combined_similarities = video_text_similarity_sigmoid_norm * audio_text_similarity_sigmoid_norm
 
-        return combined_similarities, video_text_similarity_sigmoid_norm, audio_text_similarity_sigmoid_norm
+        return combined_similarities, video_text_similarity_sigmoid_norm, audio_text_similarity_sigmoid_norm, embeddings
 
 
     def filter_classes(self, labels, decord_vr, waveform_and_sr, filter_threshold):
@@ -276,7 +282,7 @@ class VideoParserOptimizer():
             'audio': {"pixel_values": self.audio_transforms(waveform_and_sr).unsqueeze(0).to(self.device)},
         }
         
-        combined_similarities, video_text_similarity, audio_text_similarity = self.get_similiraties(labels, inputs, self.alpha)
+        combined_similarities, video_text_similarity, audio_text_similarity, _ = self.get_similiraties(labels, inputs, self.alpha)
 
         combined_events = self.events_above_threshold(labels, combined_similarities, filter_threshold)
         video_events = self.events_above_threshold(labels, video_text_similarity, filter_threshold)
