@@ -52,11 +52,11 @@ class VideoParserOptimizer():
                 label_shift_ratio = estimate_labelshift_ratio((similarities[:event_dim+1].cpu().numpy() > thresholds[:event_dim+1])*1, similarities[:event_dim+1].cpu().numpy(), 
                                                                 np.expand_dims(similarities[event_dim + 1].cpu().numpy(), 0), len(labels))
 
-                vector1 = embeddings['image'][event_dim].cpu().numpy()
-                vector2 = embeddings['image'][event_dim+1].cpu().numpy()
+                vector1 = embeddings['image'][event_dim]
+                vector2 = embeddings['image'][event_dim + 1]
 
-                cosine_similarity = np.dot(vector1, vector2) / (np.linalg.norm(vector1) * np.linalg.norm(vector2))
-                cosine_similarity = np.clip(cosine_similarity, 0, 1)
+                cosine_similarity = torch.dot(vector1, vector2) / (torch.norm(vector1) * torch.norm(vector2))
+                cosine_similarity = torch.clamp(cosine_similarity, min=0, max=1)
 
                 offset = (self.threshold_stage1 * np.e**(-self.gamma*count_events)) * label_shift_ratio * cosine_similarity
 
@@ -242,7 +242,7 @@ class VideoParserOptimizer():
         with torch.no_grad():
             embeddings = self.model(inputs)
         
-        if 'image' in embeddings:        
+        if 'image' in embeddings:
             if embeddings['image'].shape[0] != embeddings['audio'].shape[0]:
                 embeddings['audio'] = embeddings['audio'].repeat_interleave(self.sample_audio_sec, dim=0)
             
