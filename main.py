@@ -92,8 +92,8 @@ if __name__ == '__main__':
         json.dump(predictions, f)
 
     if args.dataset == "LLP":
-        print_metrices(calculate_metrices_LLP(args.video_dir_path, predictions, labels))
+        metrices, _ = calculate_metrices_LLP(args.video_dir_path, predictions, labels)
+        print_metrices(metrices)
     elif args.dataset == "AVE":
         print(calculate_ave_acc(predictions, labels, subset))
-        print_metrices(calculate_metrices_AVE(predictions, labels, subset))
 
