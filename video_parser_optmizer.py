@@ -47,24 +47,25 @@ class VideoParserOptimizer():
             tensor_slice_np = similarities[event_dim].cpu().numpy()
             indices = np.where(tensor_slice_np > thresholds[event_dim])[0]
             events = [labels[i] for i in indices]
-            if self.method == "BBSE":
+            if "bbse" in self.method:
                 count_events[indices] += 1
                 label_shift_ratio = estimate_labelshift_ratio((similarities[:event_dim+1].cpu().numpy() > thresholds[:event_dim+1])*1, similarities[:event_dim+1].cpu().numpy(), 
                                                                 np.expand_dims(similarities[event_dim + 1].cpu().numpy(), 0), len(labels))
 
-                vector1 = embeddings['image'][event_dim].cpu().numpy()
-                vector2 = embeddings['image'][event_dim+1].cpu().numpy()
+                offset = (self.threshold_stage1 * np.e**(-self.gamma*count_events)) * label_shift_ratio
 
-                cosine_similarity = np.dot(vector1, vector2) / (np.linalg.norm(vector1) * np.linalg.norm(vector2))
-                cosine_similarity = np.clip(cosine_similarity, 0, 1)
+                if self.method == 'bbse-cosine':
+                    vector1 = embeddings['image'][event_dim].cpu().numpy()
+                    vector2 = embeddings['image'][event_dim+1].cpu().numpy()
 
-                offset = (self.threshold_stage1 * np.e**(-self.gamma*count_events)) * label_shift_ratio * cosine_similarity
+                    cosine_similarity = np.dot(vector1, vector2) / (np.linalg.norm(vector1) * np.linalg.norm(vector2))
+                    cosine_similarity = np.clip(cosine_similarity, 0, 1)
+                    
+                    offset *= cosine_similarity
 
                 thresholds[event_dim + 1] = thresholds[event_dim] - offset
         
-            
             image_events_dict[f"frame-{event_dim}"] = events
-
 
         tensor_slice_np = similarities[len(similarities) - 1].cpu().numpy()
         indices = np.where(tensor_slice_np > thresholds[len(similarities) - 1])[0]
