@@ -4,7 +4,7 @@ import argparse
 import json
 import pandas as pd
 import os
-
+from sklearn.metrics import precision_score, recall_score
 
 def Precision(X_pre, X_gt):
 
@@ -296,7 +296,7 @@ def calculate_metrices_LLP(video_dir_path, pred, categories, split="test", get_p
 
     metrices_per_class = {}
     for label in categories:
-        names = ['F_seg_a', 'F_seg_v', 'F_seg', 'F_seg_av', 'F_event_a', 'F_event_v', 'F_event', 'F_event_av', 'sec_arr']
+        names = ['F_seg_a', 'F_seg_v', 'F_seg', 'F_seg_av', 'F_event_a', 'F_event_v', 'F_event', 'F_event_av', 'sec_arr']# ['hits', 'len', 'sec_arr', 'acc'] # ['F_seg_a', 'F_seg_v', 'F_seg', 'F_seg_av', 'F_event_a', 'F_event_v', 'F_event', 'F_event_av', 'sec_arr']
         metrices_per_class[label] = {name: [] for name in names}
     
 
@@ -399,6 +399,12 @@ def calculate_metrices_LLP(video_dir_path, pred, categories, split="test", get_p
             idx = categories.index(label)
             class_SO_a, class_SO_v, class_SO_av, class_GT_a, class_GT_v, class_GT_av = np.expand_dims(SO_a[idx, :], axis=0), np.expand_dims(SO_v[idx, :], axis=0), np.expand_dims(SO_av[idx, :], axis=0), np.expand_dims(GT_a[idx, :], axis=0), np.expand_dims(GT_v[idx, :], axis=0), np.expand_dims(GT_av[idx, :], axis=0)
             
+            # metrices_per_class[label]['hits'].append(recall_score(GT_av[idx, :], SO_av[idx, :]))
+            # metrices_per_class[label]['len'].append(class_SO_av.shape[0])
+
+            if np.sum(class_GT_av) == 0 and np.sum(class_SO_av) == 0:
+                continue
+
             f_a, f_v, f, f_av = segment_level(class_SO_a, class_SO_v, class_SO_av, class_GT_a, class_GT_v, class_GT_av)
             for name, value in zip(names_seg, [f_a, f_v, f, f_av]):
                 metrices_per_class[label][name].append(value)
@@ -419,6 +425,7 @@ def calculate_metrices_LLP(video_dir_path, pred, categories, split="test", get_p
 
         metrices_per_class[label] = calculate_llp_final(per_class_F_seg_a, per_class_F_seg_v, per_class_F_seg, per_class_F_seg_av, per_class_F_event_a, per_class_F_event_v, per_class_F_event, per_class_F_event_av)
         metrices_per_class[label]['avg_sec'] = avg_sec
+        # metrices_per_class[label]['acc'] = sum(metrices_per_class[label]['hits']) / sum(metrices_per_class[label]['len']) * 100
 
     return calculate_llp_final(F_seg_a, F_seg_v, F_seg, F_seg_av, F_event_a, F_event_v, F_event, F_event_av), metrices_per_class
 
@@ -541,19 +548,6 @@ def print_metrices(metrices):
     print('Event-level Type@Avg. F1: {:.1f}'.format(metrices['avg_type_event']))
     print('Event-level Event@Avg. F1: {:.1f}'.format(metrices['avg_event_level']))
 
-def create_hist(data, categories, metric_name):
-    # Plotting the bar chart
-    plt.bar(categories, data, edgecolor='black')
-    plt.xticks(categories, [c for c in categories], rotation=45, fontsize=10)  # Rotate x-axis labels
-    plt.subplots_adjust(bottom=0.2)
-
-    # Adding labels and title
-    plt.xlabel('label')
-    plt.ylabel(metric_name)
-    plt.title(f'{metric_name} bar plot')
-
-    # Displaying the plot
-    plt.savefig(f'{metric_name}_bar_plot.png')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -588,10 +582,6 @@ if __name__ == '__main__':
     if args.dataset == "LLP":
         metrices, metric_per_class = calculate_metrices_LLP(args.video_dir_path, pred, categories)
         print_metrices(metrices)
-
-        create_hist([metric_per_class[m]['F_seg_av'] for m in metric_per_class], categories, "Audio-Visual-segment")
-        create_hist([metric_per_class[m]['F_event_av'] for m in metric_per_class], categories, "Audio-Visual-event")
-
 
     elif args.dataset == "AVE":
         print(calculate_ave_acc(pred, categories, subset))            
