@@ -47,7 +47,20 @@ class VideoParserOptimizer():
             tensor_slice_np = similarities[event_dim].cpu().numpy()
             indices = np.where(tensor_slice_np > thresholds[event_dim])[0]
             events = [labels[i] for i in indices]
-            if "bbse" in self.method:
+
+            if self.method == "cosine":
+                count_events[indices] += 1
+
+                vector1 = embeddings['image'][event_dim].cpu().numpy()
+                vector2 = embeddings['image'][event_dim+1].cpu().numpy()
+
+                cosine_similarity = np.dot(vector1, vector2) / (np.linalg.norm(vector1) * np.linalg.norm(vector2))
+                cosine_similarity = np.clip(cosine_similarity, 0, 1)
+
+                offset = (self.threshold_stage1 * np.e**(-self.gamma*count_events)) * cosine_similarity
+                thresholds[event_dim + 1] = thresholds[event_dim] - offset
+
+            elif "bbse" in self.method:
                 count_events[indices] += 1
                 label_shift_ratio = estimate_labelshift_ratio((similarities[:event_dim+1].cpu().numpy() > thresholds[:event_dim+1])*1, similarities[:event_dim+1].cpu().numpy(), 
                                                                 np.expand_dims(similarities[event_dim + 1].cpu().numpy(), 0), len(labels))

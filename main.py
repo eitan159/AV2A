@@ -20,7 +20,7 @@ if __name__ == '__main__':
     parser.add_argument('--candidates_file_path', required=True, type=str)
     parser.add_argument('--sample_audio_sec', default=2, type=int)
     parser.add_argument('--dataset', default='LLP', type=str, choices=['LLP', 'AVE'])
-    parser.add_argument('--method', default='bbse', type=str, choices=['bbse', 'bbse-cosine'])
+    parser.add_argument('--method', default='bbse', type=str, choices=['bbse', 'bbse-cosine', 'cosine'])
     parser.add_argument('--without_filter_classes', action="store_true")
     parser.add_argument('--without_refine_segments', action="store_true")
     args = parser.parse_args()
