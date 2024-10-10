@@ -3,15 +3,14 @@ from dataset import LLP
 from tqdm import tqdm
 import argparse
 from eval_metrics import calculate_metrices_LLP, calculate_metrices_AVE, print_metrices, calculate_ave_acc
-from models.languagebindmodel.languagebind import LanguageBind, LanguageBindImageTokenizer, to_device
-from video_parser_optmizer import VideoParserOptimizer
-import torch
+from video_parser_optmizer import VideoParserOptimizer_CLIP_CLAP, VideoParserOptimizer_LanguageBind
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--video_dir_path', required=True, type=str)    
     parser.add_argument('--audio_dir_path', required=True, type=str)
     parser.add_argument('--gpu_id', default=-1, type=int)
+    parser.add_argument('--backbone', default='language_bind', type=str, choices=['language_bind', 'clip_clap'])
     parser.add_argument('--threshold_stage1', default=0.6, type=float)
     parser.add_argument('--threshold_stage2', default=0.6, type=float)
     parser.add_argument('--filter_threshold', default=0.5, type=float)
@@ -56,22 +55,16 @@ if __name__ == '__main__':
 
     dataset = LLP(args.video_dir_path,
                   args.audio_dir_path,
+                  args.backbone,
                   subset=subset)
 
-    clip_type = {
-        'video': 'LanguageBind_Video_FT', 
-        'audio': 'LanguageBind_Audio_FT',
-        'image': 'LanguageBind_Image',
-    }
+    if args.backbone == "language_bind":
+        model = VideoParserOptimizer_LanguageBind(args.method, labels, device, args.sample_audio_sec, alpha, 
+                            filter_threshold, threshold_stage1, threshold_stage2, gamma, args.without_filter_classes,
+                            args.without_refine_segments, args.dataset)
 
-    model = LanguageBind(clip_type=clip_type, cache_dir='./cache_dir')
-    model = model.to(device)
-    model.eval()
-    pretrained_ckpt = f'lb203/LanguageBind_Image'
-    tokenizer = LanguageBindImageTokenizer.from_pretrained(pretrained_ckpt, cache_dir='./cache_dir/tokenizer_cache_dir')
-    # modality_transform = {c: transform_dict[c](model.modality_config[c]) for c in clip_type.keys()}
-
-    model = VideoParserOptimizer(args.method, model, tokenizer, labels, device, args.sample_audio_sec, alpha, 
+    else:
+        model = VideoParserOptimizer_CLIP_CLAP(args.method, labels, device, args.sample_audio_sec, alpha, 
                             filter_threshold, threshold_stage1, threshold_stage2, gamma, args.without_filter_classes,
                             args.without_refine_segments, args.dataset)
 

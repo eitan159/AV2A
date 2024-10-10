@@ -5,6 +5,7 @@ import numpy as np
 import torch
 from torchvision.transforms._transforms_video import NormalizeVideo, RandomHorizontalFlipVideo, CenterCropVideo
 from pytorchvideo.transforms import ShortSideScale
+from torchvision.transforms import InterpolationMode
 
 OPENAI_DATASET_MEAN = (0.48145466, 0.4578275, 0.40821073)
 OPENAI_DATASET_STD = (0.26862954, 0.26130258, 0.27577711)
@@ -18,6 +19,15 @@ language_bind_image_transform = Compose(
         ]
     )
 
+BICUBIC = InterpolationMode.BICUBIC
+clip_image_transforms = Compose(
+        [
+            transforms.Resize(224, interpolation=BICUBIC),
+            transforms.CenterCrop(224),
+            Lambda(lambda x: x / 255.0),
+            transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
+        ]
+)
 
 language_bind_video_transform = Compose(
             [
@@ -58,6 +68,9 @@ class VisionTransform:
         elif transform_type == "image":
             video_data = video_data.permute(0, 3, 1, 2)  # (T, H, W, C) -> (T, C, H, W)
             video_data = language_bind_image_transform(video_data)
+        elif transform_type == "image_clip":
+            video_data = video_data.permute(0, 3, 1, 2)  # (T, H, W, C) -> (T, C, H, W)
+            video_data = clip_image_transforms(video_data)
         else:
             raise ValueError("transform_type is not defined !!!")
         
@@ -105,13 +118,16 @@ class AudioTransform:
         
         return cropped_waveform
 
-    def split_sample_audio(self, audio_data_and_origin_sr, sample_audio_sec):
+    def split_sample_audio(self, audio_data_and_origin_sr, sample_audio_sec, FM_name):
         origin_audio_data, origin_sr = audio_data_and_origin_sr
         total_seconds = origin_audio_data.shape[1] // origin_sr
         output = []
         for t in range(0, total_seconds, sample_audio_sec):
             audio_data = self.crop_audio(origin_audio_data, origin_sr, t, t + sample_audio_sec)
-            output.append(self((audio_data, origin_sr)))
+            if FM_name == "language_bind":
+                output.append(self((audio_data, origin_sr)))
+            else:
+                output.append(torch.as_tensor(audio_data).squeeze(0))
 
         return torch.stack(output)
 
