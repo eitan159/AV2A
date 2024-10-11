@@ -129,7 +129,7 @@ class AudioTransform:
             else:
                 output.append(torch.as_tensor(audio_data).squeeze(0))
 
-        return torch.stack(output)
+        return torch.stack(output) if FM_name == "language_bind" else output
 
 
     def waveform2melspec(self, audio_data):

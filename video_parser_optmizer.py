@@ -370,7 +370,7 @@ class VideoParserOptimizer_CLIP_CLAP(VideoParserOptimizer):
         else:
             combined_filtered_labels, video_filtered_labels, audio_filtered_labels = labels, labels, labels
         
-        audio_data = self.audio_transforms.split_sample_audio(waveform_and_sr, self.sample_audio_sec, FM_name="CLAP").to(self.device)
+        audio_data = self.audio_transforms.split_sample_audio(waveform_and_sr, self.sample_audio_sec, FM_name="CLAP")
         
         combined_similarities, _, _, embeddings = self.get_similiraties(combined_filtered_labels, images, audio_data, similarity_type='image')
         _, video_text_similarties, _, _ = self.get_similiraties(video_filtered_labels, images, audio_data, similarity_type='image')
@@ -497,10 +497,10 @@ class VideoParserOptimizer_CLIP_CLAP(VideoParserOptimizer):
             for event, time_ranges in video_events.items():
                 for start_time, end_time in time_ranges:
 
-                    images = images[start_time: end_time, :, :, :]
+                    tmp_images = images[start_time: end_time, :, :, :]
                     audio_data = torch.as_tensor(self.audio_transforms.crop_audio(waveform_and_sr[0], waveform_and_sr[1], start_sec=start_time, end_sec=end_time)).to(self.device)
 
-                    combined_similarities, video_text_similarties, audio_text_similarties, _ = self.get_similiraties(labels, images, audio_data, similarity_type='video')
+                    combined_similarities, video_text_similarties, audio_text_similarties, _ = self.get_similiraties(labels, tmp_images, audio_data, similarity_type='video')
                     
                     if similarity_type == "combined":
                         if self.dataset == "AVE":
