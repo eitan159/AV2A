@@ -10,7 +10,7 @@ import laion_clap
 class VideoParserOptimizer():
     def __init__(self, method, labels, device, sample_audio_sec, alpha,
                  filter_threshold, threshold_stage1, threshold_stage2, gamma, without_filter_classes,
-                 without_refine_segments, dataset) -> None:
+                 without_refine_segments, dataset, labels_shift_iters) -> None:
         
         self.method = method
         self.labels = labels
@@ -26,6 +26,7 @@ class VideoParserOptimizer():
         self.without_filter_classes = without_filter_classes
         self.without_refine_segments = without_refine_segments
         self.dataset = dataset
+        self.labels_shift_iters = labels_shift_iters
     
     def proccess_similarities(self, video_text_similarity, audio_text_similarity):
         video_text_similarity_norm = (video_text_similarity - torch.mean(video_text_similarity, dim=-1, keepdim=True)) / torch.std(video_text_similarity, dim=-1, keepdim=True)
@@ -291,47 +292,52 @@ class VideoParserOptimizer_LanguageBind(VideoParserOptimizer):
         image_events_dict = {}
         thresholds = np.full((similarities.shape[0], len(labels)), self.threshold_stage1)
         count_events = np.zeros(len(labels))
-        for event_dim in range(similarities.shape[0] - 1):
-            tensor_slice_np = similarities[event_dim].cpu().numpy()
-            indices = np.where(tensor_slice_np > thresholds[event_dim])[0]
-            events = [labels[i] for i in indices]
+        for _ in range(self.labels_shift_iters):
+            for event_dim in range(similarities.shape[0] - 1):
+                tensor_slice_np = similarities[event_dim].cpu().numpy()
+                indices = np.where(tensor_slice_np > thresholds[event_dim])[0]
+                events = [labels[i] for i in indices]
 
-            if self.method == "cosine":
-                count_events[indices] += 1
+                if self.method == "cosine":
+                    count_events[indices] += 1
 
-                vector1 = embeddings['image'][event_dim].cpu().numpy()
-                vector2 = embeddings['image'][event_dim+1].cpu().numpy()
-
-                cosine_similarity = np.dot(vector1, vector2) / (np.linalg.norm(vector1) * np.linalg.norm(vector2))
-                cosine_similarity = np.clip(cosine_similarity, 0, 1)
-
-                offset = (self.threshold_stage1 * np.e**(-self.gamma*count_events)) * cosine_similarity
-                thresholds[event_dim + 1] = thresholds[event_dim] - offset
-
-            elif "bbse" in self.method:
-                count_events[indices] += 1
-                label_shift_ratio = estimate_labelshift_ratio((similarities[:event_dim+1].cpu().numpy() > thresholds[:event_dim+1])*1, similarities[:event_dim+1].cpu().numpy(), 
-                                                                np.expand_dims(similarities[event_dim + 1].cpu().numpy(), 0), len(labels))
-
-                offset = (self.threshold_stage1 * np.e**(-self.gamma*count_events)) * label_shift_ratio
-
-                if self.method == 'bbse-cosine':
                     vector1 = embeddings['image'][event_dim].cpu().numpy()
                     vector2 = embeddings['image'][event_dim+1].cpu().numpy()
 
                     cosine_similarity = np.dot(vector1, vector2) / (np.linalg.norm(vector1) * np.linalg.norm(vector2))
                     cosine_similarity = np.clip(cosine_similarity, 0, 1)
-                    
-                    offset *= cosine_similarity
 
-                thresholds[event_dim + 1] = thresholds[event_dim] - offset
+                    offset = (self.threshold_stage1 * np.e**(-self.gamma*count_events)) * cosine_similarity
+                    thresholds[event_dim + 1] = thresholds[event_dim] - offset
+
+                elif "bbse" in self.method:
+                    count_events[indices] += 1
+                    label_shift_ratio = estimate_labelshift_ratio((similarities[:event_dim+1].cpu().numpy() > thresholds[:event_dim+1])*1, similarities[:event_dim+1].cpu().numpy(), 
+                                                                    np.expand_dims(similarities[event_dim + 1].cpu().numpy(), 0), len(labels))
+
+                    offset = (self.threshold_stage1 * np.e**(-self.gamma*count_events)) * label_shift_ratio
+
+                    if self.method == 'bbse-cosine':
+                        vector1 = embeddings['image'][event_dim].cpu().numpy()
+                        vector2 = embeddings['image'][event_dim+1].cpu().numpy()
+
+                        cosine_similarity = np.dot(vector1, vector2) / (np.linalg.norm(vector1) * np.linalg.norm(vector2))
+                        cosine_similarity = np.clip(cosine_similarity, 0, 1)
+                        
+                        offset *= cosine_similarity
+
+                    thresholds[event_dim + 1] = thresholds[event_dim] - offset
         
+        for event_dim in range(similarities.shape[0]):
+            tensor_slice_np = similarities[event_dim].cpu().numpy()
+            indices = np.where(tensor_slice_np > thresholds[event_dim])[0]
+            events = [labels[i] for i in indices]
             image_events_dict[f"frame-{event_dim}"] = events
 
-        tensor_slice_np = similarities[len(similarities) - 1].cpu().numpy()
-        indices = np.where(tensor_slice_np > thresholds[len(similarities) - 1])[0]
-        events = [labels[i] for i in indices]
-        image_events_dict[f"frame-{len(similarities) - 1}"] = events
+        # tensor_slice_np = similarities[len(similarities) - 1].cpu().numpy()
+        # indices = np.where(tensor_slice_np > thresholds[len(similarities) - 1])[0]
+        # events = [labels[i] for i in indices]
+        # image_events_dict[f"frame-{len(similarities) - 1}"] = events
 
 
         results = self.optimize_video_events(image_events_dict)
@@ -435,47 +441,48 @@ class VideoParserOptimizer_CLIP_CLAP(VideoParserOptimizer):
         image_events_dict = {}
         thresholds = np.full((similarities.shape[0], len(labels)), self.threshold_stage1)
         count_events = np.zeros(len(labels))
-        for event_dim in range(similarities.shape[0] - 1):
-            tensor_slice_np = similarities[event_dim].cpu().numpy()
-            indices = np.where(tensor_slice_np > thresholds[event_dim])[0]
-            events = [labels[i] for i in indices]
+        for _ in range(self.labels_shift_iters):
+            for event_dim in range(similarities.shape[0] - 1):
+                tensor_slice_np = similarities[event_dim].cpu().numpy()
+                indices = np.where(tensor_slice_np > thresholds[event_dim])[0]
+                events = [labels[i] for i in indices]
 
-            if self.method == "cosine":
-                count_events[indices] += 1
+                if self.method == "cosine":
+                    count_events[indices] += 1
 
-                vector1 = embeddings[event_dim].cpu().numpy()
-                vector2 = embeddings[event_dim+1].cpu().numpy()
-
-                cosine_similarity = np.dot(vector1, vector2) / (np.linalg.norm(vector1) * np.linalg.norm(vector2))
-                cosine_similarity = np.clip(cosine_similarity, 0, 1)
-
-                offset = (self.threshold_stage1 * np.e**(-self.gamma*count_events)) * cosine_similarity
-                thresholds[event_dim + 1] = thresholds[event_dim] - offset
-
-            elif "bbse" in self.method:
-                count_events[indices] += 1
-                label_shift_ratio = estimate_labelshift_ratio((similarities[:event_dim+1].cpu().numpy() > thresholds[:event_dim+1])*1, similarities[:event_dim+1].cpu().numpy(), 
-                                                                np.expand_dims(similarities[event_dim + 1].cpu().numpy(), 0), len(labels))
-
-                offset = (self.threshold_stage1 * np.e**(-self.gamma*count_events)) * label_shift_ratio
-
-                if self.method == 'bbse-cosine':
                     vector1 = embeddings[event_dim].cpu().numpy()
                     vector2 = embeddings[event_dim+1].cpu().numpy()
 
                     cosine_similarity = np.dot(vector1, vector2) / (np.linalg.norm(vector1) * np.linalg.norm(vector2))
                     cosine_similarity = np.clip(cosine_similarity, 0, 1)
-                    
-                    offset *= cosine_similarity
 
-                thresholds[event_dim + 1] = thresholds[event_dim] - offset
+                    offset = (self.threshold_stage1 * np.e**(-self.gamma*count_events)) * cosine_similarity
+                    thresholds[event_dim + 1] = thresholds[event_dim] - offset
+
+                elif "bbse" in self.method:
+                    count_events[indices] += 1
+                    label_shift_ratio = estimate_labelshift_ratio((similarities[:event_dim+1].cpu().numpy() > thresholds[:event_dim+1])*1, similarities[:event_dim+1].cpu().numpy(), 
+                                                                    np.expand_dims(similarities[event_dim + 1].cpu().numpy(), 0), len(labels))
+
+                    offset = (self.threshold_stage1 * np.e**(-self.gamma*count_events)) * label_shift_ratio
+
+                    if self.method == 'bbse-cosine':
+                        vector1 = embeddings[event_dim].cpu().numpy()
+                        vector2 = embeddings[event_dim+1].cpu().numpy()
+
+                        cosine_similarity = np.dot(vector1, vector2) / (np.linalg.norm(vector1) * np.linalg.norm(vector2))
+                        cosine_similarity = np.clip(cosine_similarity, 0, 1)
+                        
+                        offset *= cosine_similarity
+
+                    thresholds[event_dim + 1] = thresholds[event_dim] - offset
         
-            image_events_dict[f"frame-{event_dim}"] = events
 
-        tensor_slice_np = similarities[len(similarities) - 1].cpu().numpy()
-        indices = np.where(tensor_slice_np > thresholds[len(similarities) - 1])[0]
-        events = [labels[i] for i in indices]
-        image_events_dict[f"frame-{len(similarities) - 1}"] = events
+        for event_dim in range(similarities.shape[0]):
+            tensor_slice_np = similarities[event_dim].cpu().numpy()
+            indices = np.where(tensor_slice_np > thresholds[event_dim])[0]
+            events = [labels[i] for i in indices]
+            image_events_dict[f"frame-{event_dim}"] = events
 
 
         results = self.optimize_video_events(image_events_dict)

@@ -4,6 +4,15 @@ from tqdm import tqdm
 import argparse
 from eval_metrics import calculate_metrices_LLP, calculate_metrices_AVE, print_metrices, calculate_ave_acc
 from video_parser_optmizer import VideoParserOptimizer_CLIP_CLAP, VideoParserOptimizer_LanguageBind
+import torch
+import random
+import numpy as np
+
+def set_random_seed(seed):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    random.seed(seed)
+    np.random.seed(seed)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -19,10 +28,14 @@ if __name__ == '__main__':
     parser.add_argument('--candidates_file_path', required=True, type=str)
     parser.add_argument('--sample_audio_sec', default=2, type=int)
     parser.add_argument('--dataset', default='LLP', type=str, choices=['LLP', 'AVE'])
-    parser.add_argument('--method', default='bbse', type=str, choices=['bbse', 'bbse-cosine', 'cosine'])
+    parser.add_argument('--method', default='bbse', type=str, choices=['bbse', 'bbse-cosine', 'cosine', 'naive'])
     parser.add_argument('--without_filter_classes', action="store_true")
     parser.add_argument('--without_refine_segments', action="store_true")
+    parser.add_argument('--seed', default=42, type=int)
+
     args = parser.parse_args()
+
+    set_random_seed(args.seed)
 
     threshold_stage1 = args.threshold_stage1
     threshold_stage2 = args.threshold_stage2

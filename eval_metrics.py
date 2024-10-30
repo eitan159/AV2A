@@ -317,6 +317,9 @@ def calculate_metrices_LLP(video_dir_path, pred, categories, split="test", get_p
     F_event_v = []
     F_event = []
     F_event_av = []
+
+    results = []
+
     for file_name in df["filename"].values:
         
         parts = file_name.split('_')
@@ -386,12 +389,17 @@ def calculate_metrices_LLP(video_dir_path, pred, categories, split="test", get_p
         F_seg.append(f)
         F_seg_av.append(f_av)
 
+        result = {'file_name': file_name, 'segment_fav': f_av}
+
         # event-level F1 scores
         f_a, f_v, f, f_av = event_level(SO_a, SO_v, SO_av, GT_a, GT_v, GT_av)
         F_event_a.append(f_a)
         F_event_v.append(f_v)
         F_event.append(f)
         F_event_av.append(f_av)
+
+        result.update({'event_fav': f_av, 'predictions': SO_av.tolist()})
+        results.append(result)
 
         for label in categories:
             names_seg = ['F_seg_a', 'F_seg_v', 'F_seg', 'F_seg_av']
@@ -416,6 +424,8 @@ def calculate_metrices_LLP(video_dir_path, pred, categories, split="test", get_p
             if sum(GT_av[idx, :]) != 0:
                 metrices_per_class[label]['sec_arr'].append(sum(GT_av[idx, :]))
 
+    with open("test_results_LLP.json", "w") as f:
+        f.write(json.dumps(results))
 
     for label in categories:
         per_class_F_seg_a, per_class_F_seg_v, per_class_F_seg, per_class_F_seg_av, \
