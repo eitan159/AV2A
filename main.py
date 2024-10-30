@@ -32,7 +32,7 @@ if __name__ == '__main__':
     parser.add_argument('--without_filter_classes', action="store_true")
     parser.add_argument('--without_refine_segments', action="store_true")
     parser.add_argument('--seed', default=42, type=int)
-
+    parser.add_argument('--labels_shift_iters', default=1, type=int)
     args = parser.parse_args()
 
     set_random_seed(args.seed)

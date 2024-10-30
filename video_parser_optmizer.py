@@ -130,11 +130,11 @@ class VideoParserOptimizer():
 class VideoParserOptimizer_LanguageBind(VideoParserOptimizer):
     def __init__(self, method, labels, device, sample_audio_sec, alpha,
                  filter_threshold, threshold_stage1, threshold_stage2, gamma, without_filter_classes,
-                 without_refine_segments, dataset) -> None:
+                 without_refine_segments, dataset, labels_shift_iters) -> None:
         
         super().__init__(method, labels, device, sample_audio_sec, alpha,
                         filter_threshold, threshold_stage1, threshold_stage2, gamma, without_filter_classes,
-                        without_refine_segments, dataset)
+                        without_refine_segments, dataset, labels_shift_iters)
         
         clip_type = {
             'video': 'LanguageBind_Video_FT', 
@@ -353,11 +353,11 @@ class VideoParserOptimizer_LanguageBind(VideoParserOptimizer):
 class VideoParserOptimizer_CLIP_CLAP(VideoParserOptimizer):
     def __init__(self, method, labels, device, sample_audio_sec, alpha,
                  filter_threshold, threshold_stage1, threshold_stage2, gamma, without_filter_classes,
-                 without_refine_segments, dataset) -> None:
+                 without_refine_segments, dataset, labels_shift_iters) -> None:
         
         super().__init__(method, labels, device, sample_audio_sec, alpha,
                         filter_threshold, threshold_stage1, threshold_stage2, gamma, without_filter_classes,
-                        without_refine_segments, dataset)
+                        without_refine_segments, dataset, labels_shift_iters)
 
         self.clip_model, _ = clip.load("ViT-B/32", device=self.device)
         self.vision_transforms = VisionTransform()
