@@ -74,12 +74,12 @@ if __name__ == '__main__':
     if args.backbone == "language_bind":
         model = VideoParserOptimizer_LanguageBind(args.method, labels, device, args.sample_audio_sec, alpha, 
                             filter_threshold, threshold_stage1, threshold_stage2, gamma, args.without_filter_classes,
-                            args.without_refine_segments, args.dataset)
+                            args.without_refine_segments, args.dataset, args.labels_shift_iters)
 
     else:
         model = VideoParserOptimizer_CLIP_CLAP(args.method, labels, device, args.sample_audio_sec, alpha, 
                             filter_threshold, threshold_stage1, threshold_stage2, gamma, args.without_filter_classes,
-                            args.without_refine_segments, args.dataset)
+                            args.without_refine_segments, args.dataset, args.labels_shift_iters)
 
     combined_candidates, video_candidates, audio_candidates = [], [], []
     for sample in tqdm(dataset, desc="Processing samples"):
