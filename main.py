@@ -7,6 +7,7 @@ from video_parser_optmizer import VideoParserOptimizer_CLIP_CLAP, VideoParserOpt
 import torch
 import random
 import numpy as np
+from time import time
 
 def set_random_seed(seed):
     torch.manual_seed(seed)
@@ -33,6 +34,7 @@ if __name__ == '__main__':
     parser.add_argument('--without_refine_segments', action="store_true")
     parser.add_argument('--seed', default=42, type=int)
     parser.add_argument('--labels_shift_iters', default=1, type=int)
+    parser.add_argument('--fusion', default='early', type=str, choices=['early', 'late'])
     args = parser.parse_args()
 
     set_random_seed(args.seed)
@@ -82,10 +84,15 @@ if __name__ == '__main__':
                             args.without_refine_segments, args.dataset, args.labels_shift_iters)
 
     combined_candidates, video_candidates, audio_candidates = [], [], []
+    total_time = 0
     for sample in tqdm(dataset, desc="Processing samples"):
         decord_vr, waveform_and_sr, video_id = sample
-        combined_results, video_results, audio_results = model.predict(labels, decord_vr, waveform_and_sr, video_id)
         
+        start = time()
+        combined_results, video_results, audio_results = model.predict(labels, decord_vr, waveform_and_sr, video_id, args.fusion)
+        
+        total_time += time() - start 
+
         combined_candidates.append(combined_results)
         video_candidates.append(video_results)
         audio_candidates.append(audio_results)
@@ -102,4 +109,6 @@ if __name__ == '__main__':
         print_metrices(metrices)
     elif args.dataset == "AVE":
         print(calculate_ave_acc(predictions, labels, subset))
+    
+    print(f"Avg. predict time: {total_time / len(dataset)}")
 

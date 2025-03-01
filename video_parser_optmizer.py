@@ -268,7 +268,7 @@ class VideoParserOptimizer_LanguageBind(VideoParserOptimizer):
 
             return refined_segments
     
-    def predict(self, labels, decord_vr, waveform_and_sr, video_id):
+    def predict(self, labels, decord_vr, waveform_and_sr, video_id, fusion):
         if not self.without_filter_classes:
             combined_filtered_labels, video_filtered_labels, audio_filtered_labels = self.filter_classes(labels, decord_vr, waveform_and_sr, self.filter_threshold)
         else:
@@ -278,13 +278,44 @@ class VideoParserOptimizer_LanguageBind(VideoParserOptimizer):
             'image': {"pixel_values": self.vision_transforms(decord_vr, transform_type='image').to(self.device)},
             'audio': {"pixel_values": self.audio_transforms.split_sample_audio(waveform_and_sr, self.sample_audio_sec, FM_name="language_bind").to(self.device)},
         }
-        combined_similarities, _, _, embeddings_combined = self.get_similiraties(combined_filtered_labels, inputs, self.alpha)
+        if fusion == "early":
+            combined_similarities, _, _, embeddings_combined = self.get_similiraties(combined_filtered_labels, inputs, self.alpha)
+        
         _, video_text_similarties, _, embeddings_video_text = self.get_similiraties(video_filtered_labels, inputs, self.alpha)
         _, _, audio_text_similarites, embeddings_audio_text = self.get_similiraties(audio_filtered_labels, inputs, self.alpha)
 
-        combined_results = self.optimize(combined_similarities, decord_vr, waveform_and_sr, combined_filtered_labels, video_id, "combined", embeddings_combined)
         video_results = self.optimize(video_text_similarties, decord_vr, waveform_and_sr, video_filtered_labels, video_id, "video", embeddings_video_text)
         audio_results = self.optimize(audio_text_similarites, decord_vr, waveform_and_sr, audio_filtered_labels, video_id, "audio", embeddings_audio_text)
+        
+        if fusion == "early":
+            combined_results = self.optimize(combined_similarities, decord_vr, waveform_and_sr, combined_filtered_labels, video_id, "combined", embeddings_combined)
+        else:
+            late_fusion_av = []
+            for video_result in video_results[video_id]:
+                for audio_result in audio_results[video_id]:
+                    if video_result['event_label'] == audio_result['event_label']:
+                        pred_audio = np.asarray([1 if audio_result['start'] <= i < audio_result['end'] else 0 for i in range(10)])
+                        pred_video = np.asarray([1 if video_result['start'] <= i < video_result['end'] else 0 for i in range(10)])
+
+                        pred_av = pred_audio * pred_video
+
+                        diff = np.diff(pred_av, prepend=0, append=0)
+    
+                        # Find the start and end indices of segments with 1s
+                        starts = np.where(diff == 1)[0]
+                        ends = np.where(diff == -1)[0] - 1
+                        
+                        # Combine the start and end indices into segments
+                        segments = [[start, end + 1] for start, end in zip(starts, ends)]
+                        for seg in segments:
+                            late_fusion_av.append({
+                                'event_label': video_result['event_label'],
+                                'start': int(seg[0]),
+                                'end': int(seg[1]),
+                                }
+                            )
+            
+            combined_results = {video_id: late_fusion_av}
 
         return combined_results, video_results, audio_results
 
@@ -366,7 +397,7 @@ class VideoParserOptimizer_CLIP_CLAP(VideoParserOptimizer):
         self.clap = laion_clap.CLAP_Module(enable_fusion=False).to(self.device)
         self.clap.load_ckpt() # download the default pretrained checkpoint.
     
-    def predict(self, labels, decord_vr, waveform_and_sr, video_id):
+    def predict(self, labels, decord_vr, waveform_and_sr, video_id, fusion):
 
         images = self.vision_transforms(decord_vr, transform_type='image_clip').to(self.device)
         audio_data = torch.as_tensor(waveform_and_sr[0]).to(self.device)
@@ -382,9 +413,38 @@ class VideoParserOptimizer_CLIP_CLAP(VideoParserOptimizer):
         _, video_text_similarties, _, _ = self.get_similiraties(video_filtered_labels, images, audio_data, similarity_type='image')
         _, _, audio_text_similarites, _ = self.get_similiraties(audio_filtered_labels, images, audio_data, similarity_type='image')
 
-        combined_results = self.optimize(combined_similarities, images, waveform_and_sr, combined_filtered_labels, video_id, "combined", embeddings)
         video_results = self.optimize(video_text_similarties, images, waveform_and_sr, video_filtered_labels, video_id, "video", embeddings)
         audio_results = self.optimize(audio_text_similarites, images, waveform_and_sr, audio_filtered_labels, video_id, "audio", embeddings)
+
+        if fusion == "early":
+            combined_results = self.optimize(combined_similarities, images, waveform_and_sr, combined_filtered_labels, video_id, "combined", embeddings)
+        else:
+            late_fusion_av = []
+            for video_result in video_results[video_id]:
+                for audio_result in audio_results[video_id]:
+                    if video_result['event_label'] == audio_result['event_label']:
+                        pred_audio = np.asarray([1 if audio_result['start'] <= i < audio_result['end'] else 0 for i in range(10)])
+                        pred_video = np.asarray([1 if video_result['start'] <= i < video_result['end'] else 0 for i in range(10)])
+
+                        pred_av = pred_audio * pred_video
+
+                        diff = np.diff(pred_av, prepend=0, append=0)
+    
+                        # Find the start and end indices of segments with 1s
+                        starts = np.where(diff == 1)[0]
+                        ends = np.where(diff == -1)[0] - 1
+                        
+                        # Combine the start and end indices into segments
+                        segments = [[start, end + 1] for start, end in zip(starts, ends)]
+                        for seg in segments:
+                            late_fusion_av.append({
+                                'event_label': video_result['event_label'],
+                                'start': int(seg[0]),
+                                'end': int(seg[1]),
+                                }
+                            )
+            
+            combined_results = {video_id: late_fusion_av}
 
         return combined_results, video_results, audio_results
 
