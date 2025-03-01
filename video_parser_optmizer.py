@@ -4,19 +4,19 @@ from models.languagebindmodel.languagebind import to_device
 from data_transforms import VisionTransform, AudioTransform
 from label_shift import estimate_labelshift_ratio
 from models.languagebindmodel.languagebind import LanguageBind, LanguageBindImageTokenizer, to_device
+from model import LanguageBind_model
 import clip
 import laion_clap
 
 class VideoParserOptimizer():
-    def __init__(self, method, labels, device, sample_audio_sec, alpha,
+    def __init__(self, method, backbone, labels, device, alpha,
                  filter_threshold, threshold_stage1, threshold_stage2, gamma, without_filter_classes,
-                 without_refine_segments, dataset, labels_shift_iters) -> None:
+                 without_refine_segments, dataset, fusion):
         
         self.method = method
         self.labels = labels
         self.device = device
         
-        self.sample_audio_sec = sample_audio_sec
         self.alpha = alpha
         self.threshold_stage1 = threshold_stage1
         self.threshold_stage2 = threshold_stage2
@@ -26,18 +26,13 @@ class VideoParserOptimizer():
         self.without_filter_classes = without_filter_classes
         self.without_refine_segments = without_refine_segments
         self.dataset = dataset
-        self.labels_shift_iters = labels_shift_iters
-    
-    def proccess_similarities(self, video_text_similarity, audio_text_similarity):
-        video_text_similarity_norm = (video_text_similarity - torch.mean(video_text_similarity, dim=-1, keepdim=True)) / torch.std(video_text_similarity, dim=-1, keepdim=True)
-        video_text_similarity_sigmoid_norm = torch.sigmoid(video_text_similarity_norm)
 
-        audio_text_similarity_norm = (audio_text_similarity - torch.mean(audio_text_similarity, dim=-1, keepdim=True)) / torch.std(audio_text_similarity, dim=-1, keepdim=True)
-        audio_text_similarity_sigmoid_norm = torch.sigmoid(audio_text_similarity_norm)
+        self.model = LanguageBind_model(device, alpha) if backbone == 'language_bind' else None
+        self.vision_transforms = VisionTransform(model=backbone)
+        self.audio_transforms = AudioTransform(model=backbone)
 
-        combined_similarities = (1 - self.alpha) * video_text_similarity_sigmoid_norm + self.alpha * audio_text_similarity_sigmoid_norm
+        self.fusion = fusion
 
-        return combined_similarities, video_text_similarity_sigmoid_norm, audio_text_similarity_sigmoid_norm
 
     def convert_results(self, results, video_id):
         coverted_results = []
@@ -126,6 +121,135 @@ class VideoParserOptimizer():
         events = [labels[i] for i in col_indices]
 
         return events
+
+    def filter_classes(self, labels, video_transformed, audio_transformed):
+        similarities = self.model(labels, video_transformed, audio_transformed, similarity_type='combined', vision_mode='video')
+
+        combined_events = self.events_above_threshold(labels, similarities['combined'], self.filter_threshold)
+        video_events = self.events_above_threshold(labels, similarities['video'], self.filter_threshold)
+        audio_events = self.events_above_threshold(labels, similarities['audio'], self.filter_threshold)
+
+        return combined_events, video_events, audio_events
+
+    def set_thresholds(self, similarities, labels, embeddings):
+        thresholds = np.full((similarities.shape[0], len(labels)), self.threshold_stage1)
+        count_events = np.zeros(len(labels))
+
+        for event_dim in range(similarities.shape[0] - 1):
+            tensor_slice_np = similarities[event_dim].cpu().numpy()
+            indices = np.where(tensor_slice_np > thresholds[event_dim])[0]
+            count_events[indices] += 1
+            offset = (self.threshold_stage1 * np.e**(-self.gamma*count_events))
+            if "cosine" in self.method:
+
+                vector1 = embeddings[event_dim].cpu().numpy()
+                vector2 = embeddings[event_dim+1].cpu().numpy()
+                cosine_similarity = np.dot(vector1, vector2) / (np.linalg.norm(vector1) * np.linalg.norm(vector2))
+                cosine_similarity = np.clip(cosine_similarity, 0, 1)
+                offset *= cosine_similarity
+
+            if "bbse" in self.method:
+                label_shift_ratio = estimate_labelshift_ratio((similarities[:event_dim+1].cpu().numpy() > thresholds[:event_dim+1])*1, similarities[:event_dim+1].cpu().numpy(), 
+                                                                np.expand_dims(similarities[event_dim + 1].cpu().numpy(), 0), len(labels))
+                offset *= label_shift_ratio
+
+            thresholds[event_dim + 1] = thresholds[event_dim] - offset
+        
+        return thresholds
+
+    
+    def refine_segments(self, video_events, decord_vr, waveform_and_sr, labels, similarity_type):
+        if (len(video_events) == 1 and len(next(iter(video_events.values()))) == 1) or (not video_events):
+            return video_events
+        else:
+            refined_segments = {}
+            past_segments = {}
+            for event, time_ranges in video_events.items():
+                for start_time, end_time in time_ranges:
+                    audio_transformed = self.audio_transforms(waveform_and_sr, start_sec=start_time, end_sec=end_time).to(self.device)
+                    video_transformed = self.vision_transforms(decord_vr, transform_type='video', start=start_time, end=end_time).to(self.device)
+
+                    similarities = self.model(labels, audio_transformed, video_transformed, similarity_type=similarity_type, vision_mode='video')[similarity_type]
+
+                    if self.dataset == "AVE":
+                        events = [labels[similarities.argmax().item()]]
+                    else:    
+                        events = self.events_above_threshold(labels, similarities, self.threshold_stage2)
+                    similarities = similarities[0]
+
+                    if event in events:
+                        if event in refined_segments:
+                            refined_segments[event].append((start_time, end_time))
+                        else:
+                            refined_segments[event] = [(start_time, end_time)]
+                    
+                    if event in past_segments:
+                        past_segments[event].append(((start_time, end_time), similarities[labels.index(event)]))
+                    else:
+                        past_segments[event] = [((start_time, end_time), similarities[labels.index(event)])]
+            
+            if not refined_segments:
+                max_score = float('-inf')
+                max_event = None
+                max_times = None
+                for event, segments in past_segments.items():
+                    for segment in segments:
+                        if isinstance(segment, tuple) and len(segment) == 2:
+                            times, score = segment
+                            if score.item() > max_score:
+                                max_score = score.item()
+                                max_event = event
+                                max_times = times
+
+                return {max_event: [list(max_times)]}
+
+            return refined_segments
+        
+    def optimize(self, similarities, decord_vr, waveform_and_sr, labels, video_id, similarity_type, embeddings):
+        image_events_dict = {}
+        thresholds = np.full((similarities.shape[0], len(labels)), self.threshold_stage1) if self.method == 'naive' \
+                    else self.set_thresholds(similarities, labels, embeddings)
+        
+        for event_dim in range(similarities.shape[0]):
+            tensor_slice_np = similarities[event_dim].cpu().numpy()
+            indices = np.where(tensor_slice_np > thresholds[event_dim])[0]
+            events = [labels[i] for i in indices]
+            image_events_dict[f"frame-{event_dim}"] = events
+
+        results = self.optimize_video_events(image_events_dict)
+        results = self.increment_end_times(results)
+        results = self.merge_consecutive_segments(results)
+        results = self.filter_events(results)
+        
+        if not self.without_refine_segments:
+            results = self.refine_segments(results, decord_vr, waveform_and_sr, labels, similarity_type)
+        
+        return self.convert_results(results, video_id)
+
+
+
+    def __call__(self, labels, decord_vr, waveform_and_sr, video_id):
+
+        audio_transformed = self.audio_transforms(waveform_and_sr).unsqueeze(0).to(self.device)
+        combined_labels, video_labels, audio_labels = labels, labels, labels
+        
+        if not self.without_filter_classes:
+            video_transformed = self.vision_transforms(decord_vr, transform_type='video').to(self.device)
+            combined_labels, video_labels, audio_labels = self.filter_classes(labels, video_transformed, audio_transformed)
+        
+        video_similarties = self.model(video_labels, video_transformed, audio_transformed, similarity_type='image')
+        audio_similarites = self.model(audio_labels, video_transformed, audio_transformed, similarity_type='audio')
+
+        video_results = self.optimize(video_similarties['video'], decord_vr, waveform_and_sr, video_labels, video_id, "video", combined_similarities['image_features'])
+        audio_results = self.optimize(audio_similarites['audio'], decord_vr, waveform_and_sr, audio_labels, video_id, "audio", None)
+
+        if self.fusion == "early":
+            combined_similarities = self.model(combined_labels, video_transformed, audio_transformed, similarity_type='combined', vision_mode='image')
+            combined_results = self.optimize(combined_similarities['combined'], decord_vr, waveform_and_sr, combined_labels, video_id, "combined", combined_similarities['image_features'])
+
+        return combined_results, video_results, audio_results
+        
+    
 
 class VideoParserOptimizer_LanguageBind(VideoParserOptimizer):
     def __init__(self, method, labels, device, sample_audio_sec, alpha,

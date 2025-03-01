@@ -41,10 +41,12 @@ language_bind_video_transform = Compose(
         )
 
 class VisionTransform:
-    def __init__(self, num_frames = 8, images_num = 10, video_seconds = 10):
+    def __init__(self, model, num_frames = 8, images_num = 10, video_seconds = 10):
         self.video_num_frames = num_frames
         self.images_num = images_num
         self.video_seconds = video_seconds
+        self.image_transforms = clip_image_transforms if model == 'CLIP' else language_bind_image_transform
+        self.video_transforms = None if model == 'CLIP' else language_bind_video_transform
 
     def __call__(self, decord_vr, transform_type, start=None, end=None):
         fps = len(decord_vr) // 10
@@ -60,27 +62,22 @@ class VisionTransform:
         if start != None and end != None:
             frames_indicis = [frame_idx + start * fps for frame_idx in frames_indicis]
 
-        video_data = decord_vr.get_batch(frames_indicis)
+        images = decord_vr.get_batch(frames_indicis)
         
         if transform_type == "video": 
-            video_data = video_data.permute(3, 0, 1, 2)  # (T, H, W, C) -> (C, T, H, W)
-            video_data = language_bind_video_transform(video_data)
+            images = images.permute(3, 0, 1, 2)  # (T, H, W, C) -> (C, T, H, W)
+            return self.video_transforms(images)
         elif transform_type == "image":
-            video_data = video_data.permute(0, 3, 1, 2)  # (T, H, W, C) -> (T, C, H, W)
-            video_data = language_bind_image_transform(video_data)
-        elif transform_type == "image_clip":
-            video_data = video_data.permute(0, 3, 1, 2)  # (T, H, W, C) -> (T, C, H, W)
-            video_data = clip_image_transforms(video_data)
+            images = images.permute(0, 3, 1, 2)  # (T, H, W, C) -> (T, C, H, W)
+            return self.image_transforms(images)
         else:
             raise ValueError("transform_type is not defined !!!")
         
-        return video_data
-
 
 
 DEFAULT_AUDIO_FRAME_SHIFT_MS = 10
 class AudioTransform:
-    def __init__(self):
+    def __init__(self, model):
         self.sample_rate = 16000
         self.num_mel_bins = 112
         self.target_length = 1036
@@ -88,6 +85,7 @@ class AudioTransform:
         self.audio_std = 4.5689974
         self.mean = []
         self.std = []
+        self.model = model
         # mean=-4.2677393
         # std=4.5689974
         # self.norm = transforms.Normalize(mean=self.audio_mean, std=self.audio_std)
@@ -118,18 +116,18 @@ class AudioTransform:
         
         return cropped_waveform
 
-    def split_sample_audio(self, audio_data_and_origin_sr, sample_audio_sec, FM_name):
+    def split_sample_audio(self, audio_data_and_origin_sr, sample_audio_sec):
         origin_audio_data, origin_sr = audio_data_and_origin_sr
         total_seconds = origin_audio_data.shape[1] // origin_sr
         output = []
         for t in range(0, total_seconds, sample_audio_sec):
             audio_data = self.crop_audio(origin_audio_data, origin_sr, t, t + sample_audio_sec)
-            if FM_name == "language_bind":
+            if self.model == "LanguageBind":
                 output.append(self((audio_data, origin_sr)))
             else:
                 output.append(torch.as_tensor(audio_data).squeeze(0))
 
-        return torch.stack(output) if FM_name == "language_bind" else output
+        return torch.stack(output) if self.model == "LanguageBind" else output
 
 
     def waveform2melspec(self, audio_data):

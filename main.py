@@ -1,19 +1,11 @@
 import json
-from dataset import LLP
+from dataset import VideoDataset
 from tqdm import tqdm
 import argparse
 from eval_metrics import calculate_metrices_LLP, calculate_metrices_AVE, print_metrices, calculate_ave_acc
-from video_parser_optmizer import VideoParserOptimizer_CLIP_CLAP, VideoParserOptimizer_LanguageBind
-import torch
-import random
-import numpy as np
+from video_parser_optmizer import VideoParserOptimizer
+from utils import set_random_seed, load_data
 from time import time
-
-def set_random_seed(seed):
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    random.seed(seed)
-    np.random.seed(seed)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -49,39 +41,17 @@ if __name__ == '__main__':
     
     device = f"cuda:{args.gpu_id}" if args.gpu_id != -1 else "cpu"
 
-    if args.dataset == "LLP":
-        labels = ['Speech', 'Car', 'Cheering', 'Dog', 'Cat', 'Frying_(food)',
-                    'Basketball_bounce', 'Fire_alarm', 'Chainsaw', 'Cello', 'Banjo',
-                    'Singing', 'Chicken_rooster', 'Violin_fiddle', 'Vacuum_cleaner',
-                    'Baby_laughter', 'Accordion', 'Lawn_mower', 'Motorcycle', 'Helicopter',
-                    'Acoustic_guitar', 'Telephone_bell_ringing', 'Baby_cry_infant_cry', 'Blender',
-                    'Clapping']
-        subset = None
+    subset, labels = load_data(args.dataset)
 
-    elif args.dataset == "AVE":
-        with open("./test_AVE.json", 'r') as f:
-            subset = json.load(f)
-
-        labels = []
-        for k, v in subset.items():
-            labels.extend([sample['class'] for sample in v])
-        
-        labels = list(set(labels))
-
-    dataset = LLP(args.video_dir_path,
+    dataset = VideoDataset(args.video_dir_path,
                   args.audio_dir_path,
                   args.backbone,
                   subset=subset)
 
-    if args.backbone == "language_bind":
-        model = VideoParserOptimizer_LanguageBind(args.method, labels, device, args.sample_audio_sec, alpha, 
-                            filter_threshold, threshold_stage1, threshold_stage2, gamma, args.without_filter_classes,
-                            args.without_refine_segments, args.dataset, args.labels_shift_iters)
+    video_parser_optimizer = VideoParserOptimizer(args.method, args.backbone, labels, device, alpha, 
+                        filter_threshold, threshold_stage1, threshold_stage2, gamma, args.without_filter_classes,
+                        args.without_refine_segments, args.dataset, args.fusion)
 
-    else:
-        model = VideoParserOptimizer_CLIP_CLAP(args.method, labels, device, args.sample_audio_sec, alpha, 
-                            filter_threshold, threshold_stage1, threshold_stage2, gamma, args.without_filter_classes,
-                            args.without_refine_segments, args.dataset, args.labels_shift_iters)
 
     combined_candidates, video_candidates, audio_candidates = [], [], []
     total_time = 0
@@ -89,7 +59,7 @@ if __name__ == '__main__':
         decord_vr, waveform_and_sr, video_id = sample
         
         start = time()
-        combined_results, video_results, audio_results = model.predict(labels, decord_vr, waveform_and_sr, video_id, args.fusion)
+        combined_results, video_results, audio_results = video_parser_optimizer(labels, decord_vr, waveform_and_sr, video_id)
         
         total_time += time() - start 
 
