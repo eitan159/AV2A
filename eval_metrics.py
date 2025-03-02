@@ -305,9 +305,9 @@ def calculate_metrices_LLP(video_dir_path, pred, categories, split="test", get_p
     pred_audio = {list(d.keys())[0]: list(d.values())[0] for d in pred["audio"]}
 
 
-    df = pd.read_csv(f"annotations/AVVP_{split}_pd.csv", header=0, sep='\t')
-    df_a = pd.read_csv("annotations/AVVP_eval_audio.csv", header=0, sep='\t')
-    df_v = pd.read_csv("annotations/AVVP_eval_visual.csv", header=0, sep='\t')
+    df = pd.read_csv(f"data/AVVP/AVVP_{split}_pd.csv", header=0, sep='\t')
+    df_a = pd.read_csv("data/AVVP/AVVP_eval_audio.csv", header=0, sep='\t')
+    df_v = pd.read_csv("data/AVVP/AVVP_eval_visual.csv", header=0, sep='\t')
     
     F_seg_a = []
     F_seg_v = []
