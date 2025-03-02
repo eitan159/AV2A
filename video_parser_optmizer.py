@@ -234,14 +234,15 @@ class VideoParserOptimizer():
         combined_labels, video_labels, audio_labels = labels, labels, labels
         
         if not self.without_filter_classes:
-            video_transformed = self.vision_transforms(decord_vr, transform_type='video').to(self.device)
+            video_transformed = self.vision_transforms(decord_vr, transform_type='video').unsqueeze(0).to(self.device)
             combined_labels, video_labels, audio_labels = self.filter_classes(labels, video_transformed, audio_transformed)
         
+        video_transformed = self.vision_transforms(decord_vr, transform_type='image').to(self.device)
         video_similarties = self.model(video_labels, video_transformed, audio_transformed, similarity_type='image')
         audio_similarites = self.model(audio_labels, video_transformed, audio_transformed, similarity_type='audio')
 
-        video_results = self.optimize(video_similarties['video'], decord_vr, waveform_and_sr, video_labels, video_id, "video", combined_similarities['image_features'])
-        audio_results = self.optimize(audio_similarites['audio'], decord_vr, waveform_and_sr, audio_labels, video_id, "audio", None)
+        video_results = self.optimize(video_similarties['image'], decord_vr, waveform_and_sr, video_labels, video_id, "video", video_similarties['image_features'])
+        audio_results = self.optimize(audio_similarites['audio'].repeat(video_similarties['image'].shape[0], 1), decord_vr, waveform_and_sr, audio_labels, video_id, "audio", None)
 
         if self.fusion == "early":
             combined_similarities = self.model(combined_labels, video_transformed, audio_transformed, similarity_type='combined', vision_mode='image')

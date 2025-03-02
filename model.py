@@ -17,6 +17,8 @@ def pad_similarities(vision_text_similarity, audio_text_similarity, device):
         pad = torch.zeros_like(audio_text_similarity[0].unsqueeze(0)).to(device)
         pad = pad.repeat(vision_text_similarity.shape[0] - audio_text_similarity.shape[0], 1)
         audio_text_similarity = torch.cat((audio_text_similarity, pad), dim=0)
+    
+    return vision_text_similarity, audio_text_similarity
 
 def norm_similarities(similarities):
         similarities = (similarities - torch.mean(similarities, dim=-1, keepdim=True)) / torch.std(similarities, dim=-1, keepdim=True)
@@ -28,6 +30,8 @@ def calculate_combined_similarity(video_text_similarity, audio_text_similarity, 
 
 
 class LanguageBind_model:
+    audio_frames = 10
+
     def __init__(self, device, alpha):
         clip_type = {
             'video': 'LanguageBind_Video_FT', 
@@ -104,6 +108,7 @@ class LanguageBind_model:
             assert vision_mode in similarities, f"Vision mode '{vision_mode}' is missing in similarity computations."
 
             # Pad similarities if needed
+            similarities['audio'] = similarities['audio'].repeat(similarities[vision_mode].shape[0], 1)
             vision_text_similarity, audio_text_similarity = pad_similarities(similarities[vision_mode], similarities['audio'], self.device)
 
             similarities['combined'] = calculate_combined_similarity(vision_text_similarity, audio_text_similarity, self.alpha)
