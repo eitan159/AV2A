@@ -123,6 +123,50 @@ class VideoParserOptimizer():
 
         return events
 
+    def late_fusion(self, video_id, video_results, audio_results):
+            # Convert results to structured NumPy arrays for fast processing
+            video_events = np.array([(v['event_label'], v['start'], v['end']) for v in video_results[video_id]])
+            audio_events = np.array([(a['event_label'], a['start'], a['end']) for a in audio_results[video_id]])
+
+            if video_events.size == 0 or audio_events.size == 0:
+                return {video_id: []}
+
+            # Extract unique event labels that appear in both video and audio
+            common_events = np.intersect1d(video_events[:, 0], audio_events[:, 0])
+
+            late_fusion_av = []
+            
+            for event_label in common_events:
+                # Select matching event segments for the given label
+                video_segments = video_events[video_events[:, 0] == event_label][:, 1:].astype(int)
+                audio_segments = audio_events[audio_events[:, 0] == event_label][:, 1:].astype(int)
+
+                # Create a binary timeline for video & audio presence
+                max_time = 10  # Assuming max timeline length (adjust if needed)
+                pred_video = np.zeros(max_time, dtype=int)
+                pred_audio = np.zeros(max_time, dtype=int)
+
+                for start, end in video_segments:
+                    pred_video[start:end] = 1
+                for start, end in audio_segments:
+                    pred_audio[start:end] = 1
+
+                # Compute late fusion by logical AND
+                pred_av = np.logical_and(pred_audio, pred_video).astype(int)
+
+                # Detect event segments (vectorized)
+                diff = np.diff(np.concatenate(([0], pred_av, [0])))  # Add 0 at start & end
+                starts = np.flatnonzero(diff == 1)  # Transition from 0 → 1
+                ends = np.flatnonzero(diff == -1)  # Transition from 1 → 0
+
+                # Store results using list comprehension
+                late_fusion_av.extend(
+                    {'event_label': event_label, 'start': int(s), 'end': int(e)}
+                    for s, e in zip(starts, ends)
+                )
+
+            return {video_id: late_fusion_av}
+
     def filter_classes(self, labels, video_transformed, audio_transformed):
         similarities = self.model(labels, video_transformed, audio_transformed, similarity_type='combined', vision_mode='video')
 
@@ -241,6 +285,8 @@ class VideoParserOptimizer():
         if self.fusion == "early":
             combined_similarities = self.model(combined_labels, video_transformed, audio_transformed, similarity_type='combined', vision_mode='image')
             combined_results = self.optimize(combined_similarities['combined'], decord_vr, waveform_and_sr, combined_labels, video_id, "combined", combined_similarities['image_features'])
+        elif self.fusion == "late":
+           combined_results = self.late_fusion(video_id, video_results, audio_results)
 
         return combined_results, video_results, audio_results
         
