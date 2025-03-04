@@ -44,8 +44,6 @@ class LanguageBind_model:
         self.model.eval()
         pretrained_ckpt = f'lb203/LanguageBind_Image'
         self.tokenizer = LanguageBindImageTokenizer.from_pretrained(pretrained_ckpt, cache_dir='./cache_dir/tokenizer_cache_dir')
-        self.vision_transforms = VisionTransform(model="LanguageBind")
-        self.audio_transforms = AudioTransform(model="LanguageBind")
         self.alpha = alpha
 
 
@@ -117,42 +115,67 @@ class LanguageBind_model:
 
 
 class CLIP_CLAP_model:
-    def __init__(self, device):
+    def __init__(self, device, alpha):
         self.device = device
+        self.alpha = alpha
         self.clip_model, _ = clip.load("ViT-B/32", device=self.device)
-        self.vision_transforms = VisionTransform(model="CLIP")
-        self.audio_transforms = AudioTransform(model="CLAP")
 
         self.clap = laion_clap.CLAP_Module(enable_fusion=False).to(self.device)
-        self.clap.load_ckpt() # download the default pretrained checkpoint.
-    
-    def __call__(self, labels, video_transformed, audio_trnasformed, similarity_type):
+        self.clap.load_ckpt()  # Load default pretrained checkpoint.
+
+    def __call__(self, labels, vision_transformed=None, audio_transformed=None, similarity_type='audio', vision_mode='video'):
+        """
+        Compute and return similarity scores based on the requested modality.
+
+        similarity_type options:
+        - 'audio': returns only audio-text similarity
+        - 'image': returns only image-text similarity
+        - 'video': returns only video-text similarity
+        - 'combined': returns a weighted combination of audio and vision similarity (requires audio)
+
+        vision_mode options (only relevant for 'combined'):
+        - 'video': use video-text similarity for combination
+        - 'image': use image-text similarity for combination
+        """
+        # Prepare text labels for CLIP and CLAP
         clap_text_labels = [f"This is a sound of {label}" for label in labels]
-        clip_text_labels = clip.tokenize([f"a {label}" for label in labels]).to(self.device)
-        
+        clip_text_labels = clip.tokenize([f"A {label}" for label in labels]).to(self.device)
+
         with torch.no_grad():
-            audio_features = self.clap.get_audio_embedding_from_data(x = audio_data, use_tensor=True)
-            clap_text_features = self.clap.get_text_embedding(clap_text_labels, use_tensor=True).to(self.device)
+            similarities = {}
 
-            image_features = self.clip_model.encode_image(images)
-            clip_text_features = self.clip_model.encode_text(clip_text_labels)
+            # Compute audio features if needed
+            if similarity_type in ['audio', 'combined']:
+                assert audio_transformed is not None, "Audio input is required for similarity calculation."
+                audio_features = self.clap.get_audio_embedding_from_data(x=audio_transformed, use_tensor=True)
+                clap_text_features = self.clap.get_text_embedding(clap_text_labels, use_tensor=True).to(self.device)
+                similarities['audio'] = norm_similarities(audio_features @ clap_text_features.T)
 
-        
-        if similarity_type == "image":
-            # if image_features.shape[0] != audio_features.shape[0]:
-            #     audio_features = audio_features.repeat_interleave(self.sample_audio_sec, dim=0)
-            vision_text_similarity = image_features @ clip_text_features.T
-        
-        elif similarity_type == "video":
-            vision_text_similarity = image_features @ clip_text_features.T
-            vision_text_similarity = vision_text_similarity.mean(dim=0).unsqueeze(0)
-        else:
-            raise ValueError("Similarity type is wrong !")
+            # Compute vision features if needed
+            if similarity_type in ['image', 'video', 'combined']:
+                assert vision_transformed is not None, f"{vision_mode.capitalize()} input is required."
+                vision_features = self.clip_model.encode_image(vision_transformed)
+                clip_text_features = self.clip_model.encode_text(clip_text_labels)
+                similarities[vision_mode] = norm_similarities(vision_features @ clip_text_features.T)
 
-        audio_text_similarity = audio_features @ clap_text_features.T
-            
-        pad_similarities(vision_text_similarity, audio_text_similarity, self.device)
+                # Store image features for reference
+                if vision_mode == 'image':
+                    similarities['image_features'] = vision_features
 
-        return norm_similarities(vision_text_similarity), norm_similarities(audio_text_similarity), image_features
+                # # If video mode, average frame-wise similarity
+                # if vision_mode == 'video':
+                #     similarities['video'] = similarities['video'].mean(dim=0).unsqueeze(0)
 
-        
+            # Compute combined similarity if required
+            if similarity_type == 'combined':
+                assert 'audio' in similarities, "Audio similarity is required for combined similarity."
+                assert vision_mode in similarities, f"Vision mode '{vision_mode}' is missing in similarity computations."
+
+                # Pad similarities if needed
+                similarities['audio'] = similarities['audio'].repeat(similarities[vision_mode].shape[0], 1)
+                vision_text_similarity, audio_text_similarity = pad_similarities(similarities[vision_mode], similarities['audio'], self.device)
+
+                # Compute combined similarity
+                similarities['combined'] = calculate_combined_similarity(vision_text_similarity, audio_text_similarity, self.alpha)
+
+        return similarities

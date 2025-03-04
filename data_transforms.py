@@ -39,14 +39,15 @@ language_bind_video_transform = Compose(
                 RandomHorizontalFlipVideo(p=0.5),
             ]
         )
-
+'language_bind', 'clip_clap'
 class VisionTransform:
     def __init__(self, model, num_frames = 8, images_num = 10, video_seconds = 10):
         self.video_num_frames = num_frames
         self.images_num = images_num
         self.video_seconds = video_seconds
-        self.image_transforms = clip_image_transforms if model == 'CLIP' else language_bind_image_transform
-        self.video_transforms = None if model == 'CLIP' else language_bind_video_transform
+        self.image_transforms = clip_image_transforms if model == "clip_clap" else language_bind_image_transform
+        self.video_transforms = None if model == "clip_clap" else language_bind_video_transform
+        self.model = model
 
     def __call__(self, decord_vr, transform_type, start=None, end=None):
         fps = len(decord_vr) // 10
@@ -65,11 +66,16 @@ class VisionTransform:
         images = decord_vr.get_batch(frames_indicis)
         
         if transform_type == "video": 
+            if self.model == "clip_clap":
+                return self.image_transforms(images.permute(0, 3, 1, 2)).mean(dim=0, keepdim=True)
+            
             images = images.permute(3, 0, 1, 2)  # (T, H, W, C) -> (C, T, H, W)
-            return self.video_transforms(images)
+            return self.video_transforms(images).unsqueeze(0)
+        
         elif transform_type == "image":
             images = images.permute(0, 3, 1, 2)  # (T, H, W, C) -> (T, C, H, W)
             return self.image_transforms(images)
+        
         else:
             raise ValueError("transform_type is not defined !!!")
         
@@ -94,14 +100,20 @@ class AudioTransform:
     def __call__(self, audio_data_and_origin_sr, start_sec=None, end_sec=None):
         audio_data, origin_sr = audio_data_and_origin_sr
 
-        if start_sec != None and end_sec != None:
-            audio_data = self.crop_audio(audio_data, origin_sr, start_sec, end_sec)
+        if self.model == "clip_clap" and start_sec is None and end_sec is None:
+            return torch.as_tensor(audio_data)
 
+        if start_sec != None and end_sec != None:
+            if self.model == "clip_clap":
+                return torch.as_tensor(self.crop_audio(audio_data, origin_sr, start_sec, end_sec))
+
+            audio_data = self.crop_audio(audio_data, origin_sr, start_sec, end_sec)
+            
         if self.sample_rate != origin_sr:
             # print(audio_data.shape, origin_sr)
             audio_data = torchaudio.functional.resample(audio_data, orig_freq=origin_sr, new_freq=self.sample_rate)
         waveform_melspec = self.waveform2melspec(audio_data)
-        return waveform_melspec
+        return waveform_melspec.unsqueeze(0)
     
     def crop_audio(self, waveform, sample_rate, start_sec, end_sec):
         # Calculate the start and end sample indices
@@ -122,12 +134,12 @@ class AudioTransform:
         output = []
         for t in range(0, total_seconds, sample_audio_sec):
             audio_data = self.crop_audio(origin_audio_data, origin_sr, t, t + sample_audio_sec)
-            if self.model == "LanguageBind":
+            if self.model == "language_bind":
                 output.append(self((audio_data, origin_sr)))
             else:
                 output.append(torch.as_tensor(audio_data).squeeze(0))
 
-        return torch.stack(output) if self.model == "LanguageBind" else output
+        return torch.stack(output) if self.model == "language_bind" else output
 
 
     def waveform2melspec(self, audio_data):

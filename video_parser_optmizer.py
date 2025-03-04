@@ -4,7 +4,7 @@ from models.languagebindmodel.languagebind import to_device
 from data_transforms import VisionTransform, AudioTransform
 from label_shift import estimate_labelshift_ratio
 from models.languagebindmodel.languagebind import LanguageBind, LanguageBindImageTokenizer, to_device
-from model import LanguageBind_model
+from model import LanguageBind_model, CLIP_CLAP_model
 import clip
 import laion_clap
 from torch.nn.functional import cosine_similarity
@@ -28,7 +28,7 @@ class VideoParserOptimizer():
         self.without_refine_segments = without_refine_segments
         self.dataset = dataset
 
-        self.model = LanguageBind_model(device, alpha) if backbone == 'language_bind' else None
+        self.model = LanguageBind_model(device, alpha) if backbone == 'language_bind' else CLIP_CLAP_model(device, alpha)
         self.vision_transforms = VisionTransform(model=backbone)
         self.audio_transforms = AudioTransform(model=backbone)
 
@@ -197,7 +197,6 @@ class VideoParserOptimizer():
         
         return thresholds
 
-    
     def refine_segments(self, video_events, decord_vr, waveform_and_sr, labels, similarity_type):
         if (len(video_events) == 1 and len(next(iter(video_events.values()))) == 1) or (not video_events):
             return video_events
@@ -206,8 +205,8 @@ class VideoParserOptimizer():
             past_segments = {}
             for event, time_ranges in video_events.items():
                 for start_time, end_time in time_ranges:
-                    audio_transformed = self.audio_transforms(waveform_and_sr, start_sec=start_time, end_sec=end_time).unsqueeze(0).to(self.device)
-                    video_transformed = self.vision_transforms(decord_vr, transform_type='video', start=start_time, end=end_time).unsqueeze(0).to(self.device)
+                    audio_transformed = self.audio_transforms(waveform_and_sr, start_sec=start_time, end_sec=end_time).to(self.device)
+                    video_transformed = self.vision_transforms(decord_vr, transform_type='video', start=start_time, end=end_time).to(self.device)
 
                     similarities = self.model(labels, video_transformed, audio_transformed, similarity_type=similarity_type, vision_mode='video')[similarity_type]
 
@@ -268,15 +267,15 @@ class VideoParserOptimizer():
 
     def __call__(self, labels, decord_vr, waveform_and_sr, video_id):
 
-        audio_transformed = self.audio_transforms(waveform_and_sr).unsqueeze(0).to(self.device)
+        audio_transformed = self.audio_transforms(waveform_and_sr).to(self.device)
         combined_labels, video_labels, audio_labels = labels, labels, labels
         
         if not self.without_filter_classes:
-            video_transformed = self.vision_transforms(decord_vr, transform_type='video').unsqueeze(0).to(self.device)
+            video_transformed = self.vision_transforms(decord_vr, transform_type='video').to(self.device)
             combined_labels, video_labels, audio_labels = self.filter_classes(labels, video_transformed, audio_transformed)
         
         video_transformed = self.vision_transforms(decord_vr, transform_type='image').to(self.device)
-        video_similarties = self.model(video_labels, video_transformed, audio_transformed, similarity_type='image')
+        video_similarties = self.model(video_labels, video_transformed, audio_transformed, similarity_type='image', vision_mode='image')
         audio_similarites = self.model(audio_labels, video_transformed, audio_transformed, similarity_type='audio')
 
         video_results = self.optimize(video_similarties['image'], decord_vr, waveform_and_sr, video_labels, video_id, "video", video_similarties['image_features'])
