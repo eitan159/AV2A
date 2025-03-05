@@ -163,8 +163,8 @@ class CLIP_CLAP_model:
                     similarities['image_features'] = vision_features
 
                 # # If video mode, average frame-wise similarity
-                # if vision_mode == 'video':
-                #     similarities['video'] = similarities['video'].mean(dim=0).unsqueeze(0)
+                if vision_mode == 'video':
+                    similarities['video'] = similarities['video'].mean(dim=0, keepdim=True)
 
             # Compute combined similarity if required
             if similarity_type == 'combined':

@@ -67,7 +67,7 @@ class VisionTransform:
         
         if transform_type == "video": 
             if self.model == "clip_clap":
-                return self.image_transforms(images.permute(0, 3, 1, 2)).mean(dim=0, keepdim=True)
+                return self.image_transforms(images.permute(0, 3, 1, 2))
             
             images = images.permute(3, 0, 1, 2)  # (T, H, W, C) -> (C, T, H, W)
             return self.video_transforms(images).unsqueeze(0)
