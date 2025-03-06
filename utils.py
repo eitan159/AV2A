@@ -20,7 +20,7 @@ def load_data(dataset_name):
         subset = None
 
     elif dataset_name == "AVE":
-        with open("./test_AVE.json", 'r') as f:
+        with open("./data/AVE/test_AVE.json", 'r') as f:
             subset = json.load(f)
 
         labels = []
