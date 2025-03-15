@@ -2,7 +2,6 @@
 *.mp4
 *.mp3
 *.jpg
-*.json
 *.vscode
 cache_dir/
 cache_dir
@@ -14,6 +13,5 @@ __pycache__
 *.sh
 *.out
 *.txt
-*.png
 sample_audio_chunks/
 cropped_files/
