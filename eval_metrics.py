@@ -575,7 +575,7 @@ if __name__ == '__main__':
                     'Clapping']
     
     elif args.dataset == "AVE":
-        with open("./test_AVE.json", 'r') as f:
+        with open("./data/test_AVE.json", 'r') as f:
             subset = json.load(f)
 
         categories = []
