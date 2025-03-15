@@ -16,10 +16,10 @@ conda env create -f environment.yml
 ## Run
 ````
 # LanguageBind
-python main.py --video_dir_path "" --audio_dir_path "" --gpu_id 0 --backbone language_bind --candidates_file_path "" --alpha 0.5 --filter_threshold 0.55 --threshold_stage1 0.75 --threshold_stage2 0.75 --gamma 2.5 --dataset LLP/AVE --method naive --fusion early
+python main.py --video_dir_path "" --audio_dir_path "" --gpu_id 0 --backbone language_bind --candidates_file_path "" --alpha 0.5 --filter_threshold 0.55 --threshold_stage1 0.75 --threshold_stage2 0.75 --gamma 2.5 --dataset LLP/AVE --method bbse-cosine --fusion early
 
 # CLIP & CLAP
-python main.py --video_dir_path "" --audio_dir_path "" --gpu_id 0 --backbone clip_clap --candidates_file_path "" --alpha 0.45 --filter_threshold 0.5 --threshold_stage1 0.75 --threshold_stage2 0.75 --gamma 1 --dataset LLP/AVE --method naive --fusion early
+python main.py --video_dir_path "" --audio_dir_path "" --gpu_id 0 --backbone clip_clap --candidates_file_path "" --alpha 0.45 --filter_threshold 0.5 --threshold_stage1 0.75 --threshold_stage2 0.75 --gamma 1 --dataset LLP/AVE --method bbse-cosine --fusion early
 ````
 
 ## Citation
