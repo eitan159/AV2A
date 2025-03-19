@@ -1,6 +1,8 @@
 # Adapting to the Unknown: Training-Free Audio-Visual Event Perception with Dynamic Thresholds [CVPR2025]
-This repo is the official code of ["Adapting to the Unknown: Training-Free Audio-Visual Event Perception with Dynamic Thresholds"](https://arxiv.org/pdf/2404.03179.pdf). TODO replace to our arxiv link
 
+<p align="center">
+  <a href="https://arxiv.org/abs/2503.13693"><img src="https://img.shields.io/badge/arXiv-2503.13693-b31b1b.svg" height=20.5></a>
+</p>
 
 ## Abstract
 In the domain of audio-visual event perception, which focuses on the temporal localization and classification of events across distinct modalities (audio and visual), existing approaches are constrained by the vocabulary available in their training data. This limitation significantly impedes their capacity to generalize to novel, unseen event categories. Furthermore, the annotation process for this task is labor-intensive, requiring extensive manual labeling across modalities and temporal segments, limiting the scalability of current methods. Current state-of-the-art models ignore the shifts in event distributions over time, reducing their ability to adjust to changing video dynamics. Additionally, previous methods rely on late fusion to combine audio and visual information. While straightforward, this approach results in a significant loss of multimodal interactions.  
@@ -25,5 +27,13 @@ python main.py --video_dir_path "" --audio_dir_path "" --gpu_id 0 --backbone cli
 ## Citation
 If you find our code useful for your research, please consider citing our paper.
 ```
-Our CITE
+@misc{shaar2025adaptingunknowntrainingfreeaudiovisual,
+      title={Adapting to the Unknown: Training-Free Audio-Visual Event Perception with Dynamic Thresholds}, 
+      author={Eitan Shaar and Ariel Shaulov and Gal Chechik and Lior Wolf},
+      year={2025},
+      eprint={2503.13693},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2503.13693}, 
+}
 ```
