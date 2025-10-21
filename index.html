@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Adapting to the Unknown: Training-Free Audio-Visual Event Perception with Dynamic Thresholds</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="AV2A: Training-free, open-vocabulary audio-visual event perception with score-level fusion and dynamic thresholds.">
+  <link rel="stylesheet" href="static/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- Header / Hero -->
+  <header class="hero">
+    <div class="container">
+      <h1 class="title">Adapting to the Unknown: Training-Free Audio-Visual Event Perception with Dynamic Thresholds</h1>
+      <p class="subtitle">Eitan Shaar · Ariel Shaulov · Gal Chechik · Lior Wolf</p>
+      <p class="affils">Bar-Ilan University · Tel-Aviv University · NVIDIA</p>
+
+      <div class="cta">
+        <a class="btn primary" href="paper.pdf" target="_blank" rel="noopener">Paper (PDF)</a>
+        <a class="btn" href="https://github.com/eitan159/AV2A" target="_blank" rel="noopener">Code</a>
+        <a class="btn" href="#bibtex">BibTeX</a>
+      </div>
+
+      <!-- Optional teaser video or image -->
+      <div class="teaser">
+        <!-- If you have a teaser video on YouTube, replace the image with an iframe. -->
+        <img src="static/images/teaser.png" alt="Teaser figure">
+        <p class="caption">Teaser: AV2A performs training-free, open-vocabulary AV event perception with score-level fusion and dynamic thresholds.</p>
+      </div>
+    </div>
+  </header>
+
+  <!-- Abstract -->
+  <section id="abstract" class="section">
+    <div class="container">
+      <h2>Abstract</h2>
+      <p>
+        We address audio-visual event perception—temporal localization and classification across audio and visual modalities.
+        Existing approaches rely on fixed vocabularies and often use late fusion, limiting multimodal interactions and adaptability.
+        We propose a training-free, model-agnostic framework (AV2A) that (1) performs score-level <em>early</em> fusion and
+        (2) adapts via a within-video label-shift mechanism with dynamic, time-varying thresholds derived from prior frames.
+        AV2A yields strong training-free, open-vocabulary performance and adds consistent gains when layered on weakly-supervised SOTA—without additional training.
+      </p>
+    </div>
+  </section>
+
+  <!-- Method -->
+  <section id="method" class="section alt">
+    <div class="container">
+      <h2>Method at a Glance</h2>
+      <div class="grid">
+        <div>
+          <ul class="bullets">
+            <li><b>Score-level early fusion:</b> weighted combination of audio/text and visual/text similarities preserves multimodal interactions versus late fusion.</li>
+            <li><b>Dynamic thresholds:</b> within-video label-shift uses prior frame predictions and feature similarity to adjust per-class thresholds over time.</li>
+            <li><b>Training-free & open-vocabulary:</b> plug in foundation models and infer without additional training.</li>
+          </ul>
+        </div>
+        <div class="figure">
+          <img src="static/images/method.png" alt="Method diagram">
+          <p class="caption">Overview of AV2A pipeline (score-level fusion + dynamic thresholds).</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Results -->
+  <section id="results" class="section">
+    <div class="container">
+      <h2>Results</h2>
+      <div class="cards">
+        <div class="card">
+          <h3>Training-free baselines</h3>
+          <p>Substantial gains over naïve training-free baselines on LLP and AVE.</p>
+          <img src="static/images/results1.png" alt="Results chart 1">
+        </div>
+        <div class="card">
+          <h3>Add-on to weakly-supervised SOTA</h3>
+          <p>Dynamic thresholds improve multiple AVVP systems without any extra training.</p>
+          <img src="static/images/results2.png" alt="Results chart 2">
+        </div>
+      </div>
+      <p class="note">Replace images above with your actual tables/plots exported as PNGs.</p>
+    </div>
+  </section>
+
+  <!-- BibTeX -->
+  <section id="bibtex" class="section alt">
+    <div class="container">
+      <h2>BibTeX</h2>
+      <pre class="bibtex">
+@inproceedings{shaar2025av2a,
+  title={Adapting to the Unknown: Training-Free Audio-Visual Event Perception with Dynamic Thresholds},
+  author={Shaar, Eitan and Shaulov, Ariel and Chechik, Gal and Wolf, Lior},
+  booktitle={Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition},
+  year={2025}
+}
+      </pre>
+    </div>
+  </section>
+
+  <!-- Acknowledgments -->
+  <section id="acks" class="section">
+    <div class="container">
+      <h2>Acknowledgments</h2>
+      <p>We thank collaborators and supporting institutions. See paper for details.</p>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="container">
+      <p>© 2025 — Eitan Shaar · Ariel Shaulov · Gal Chechik · Lior Wolf</p>
+      <p class="small">Static site for GitHub Pages. Replace images in <code>static/images/</code> and <code>paper.pdf</code> as needed.</p>
+    </div>
+  </footer>
+
+</body>
+</html>
