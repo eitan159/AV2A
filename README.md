@@ -1,6 +1,7 @@
 # Adapting to the Unknown: Training-Free Audio-Visual Event Perception with Dynamic Thresholds [CVPR2025]
 
 <p align="center">
+  <a href="https://eitan159.github.io/AV2A/"><img src="https://img.shields.io/static/v1?label=Project&message=Website&color=red" height=20.5></a> 
   <a href="https://arxiv.org/abs/2503.13693"><img src="https://img.shields.io/badge/arXiv-2503.13693-b31b1b.svg" height=20.5></a>
 </p>
 
