@@ -47,6 +47,10 @@
             Adapting to the Unknown: Training-Free Audio-Visual Event Perception with Dynamic Thresholds
           </h1>
 
+          <div class="is-size-4 has-text-weight-semibold" style="margin-top: 12px; margin-bottom: 16px; color: #363636;">
+            CVPR 2025
+          </div>
+
           <div class="is-size-5 publication-authors">
             <span class="author-block">*Eitan Shaar<sup>1</sup>,</span>
             <span class="author-block">*Ariel Shaulov<sup>2</sup>,</span>
@@ -141,17 +145,15 @@
   <div class="container is-max-desktop">
     <div class="columns is-centered">
       <div class="column is-10">
-        <h2 class="title is-3 has-text-centered">Method at a Glance</h2>
-        <div class="content">
-          <ul>
-            <li><strong>Score-level early fusion</strong> (weighted sum) preserves richer multimodal interactions vs. late fusion.</li>
-            <li><strong>Within-video label shift</strong> dynamically adjusts per-class thresholds over time from prior-frame evidence.</li>
-            <li><strong>Training-free & open-vocabulary</strong>: plug in foundation models (e.g., CLIP/CLAP, LanguageBind) with no extra training.</li>
-          </ul>
-        </div>
+        <h2 class="title is-3 has-text-centered">Method</h2>
         <figure class="image" style="margin-top: 16px;">
           <img src="./static/images/main_figure.png" alt="Method diagram">
         </figure>
+        <div class="content has-text-justified" style="margin-top: 16px;">
+          <p>
+            <strong>Overview of AV<sup>2</sup>A.</strong> The process begins with category selection, where the input video clip passes through a video-level score-level fusion module (blue) to select relevant categories based on a threshold <em>&tau;<sub>f</sub></em>. These categories guide segment-level score-level fusion, where a dynamic threshold module (orange) updates thresholds <em>&tau;<sup>t</sup></em> via our label-shift technique, using the soft confusion matrix <em>M</em> from prior predictions <em>Y<sub>1</sub>, . . . , Y<sub>t&minus;1</sub></em> and segment scores <em>P<sup>1</sup><sub>av</sub>, . . . , P<sup>t&minus;1</sup><sub>av</sub></em>, cosine similarity between segments and <em>P<sup>t</sup><sub>av</sub></em>. Finally, predicted candidates are validated against a confidence threshold <em>&tau;<sub>r</sub></em>, retaining only those above it. This figure illustrates the process for audio-visual events; audio and visual events are handled similarly.
+          </p>
+        </div>
       </div>
     </div>
   </div>
@@ -200,7 +202,7 @@
 <footer class="footer">
   <div class="container">
     <div class="content has-text-centered">
-      <a class="icon-link" href="paper.pdf"><i class="fas fa-file-pdf"></i></a>
+      <a class="icon-link" href="https://arxiv.org/abs/2503.13693.pdf"><i class="fas fa-file-pdf"></i></a>
       <a class="icon-link" href="https://github.com/eitan159/AV2A" target="_blank" rel="noopener">
         <i class="fab fa-github"></i>
       </a>
