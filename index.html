@@ -140,6 +140,22 @@
   </div>
 </section>
 
+<!-- Task Overview -->
+<section class="section">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered">
+      <div class="column is-10">
+        <figure class="image">
+          <img src="./static/images/task_figure.png" alt="Audio-Visual Event Perception Task">
+        </figure>
+        <p class="has-text-justified" style="margin-top: 12px;">
+          <strong>Overview of the AVVP task.</strong> Audio-visual event perception focuses on predicting the temporal boundaries of events within a video that are exclusively visible (shown in blue), exclusively audible (shown in red), or both audible and visible (shown in purple).
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- Method -->
 <section class="section">
   <div class="container is-max-desktop">
@@ -164,24 +180,39 @@
   <div class="container is-max-desktop">
     <h2 class="title is-3 has-text-centered">Results</h2>
     <div class="columns is-centered">
-      <div class="column is-5">
-        <div class="content has-text-centered">
-          <h3 class="title is-5">Training-free baselines</h3>
-          <p>AV2A improves naïve training-free baselines on LLP and AVE.</p>
-          <img src="./static/images/results1.png" alt="Results chart 1">
-        </div>
-      </div>
-      <div class="column is-5">
-        <div class="content has-text-centered">
-          <h3 class="title is-5">Add-on to weakly-supervised SOTA</h3>
-          <p>Dynamic thresholds add consistent gains without additional training.</p>
-          <img src="./static/images/results2.png" alt="Results chart 2">
-        </div>
+      <div class="column is-10">
+        <figure class="image" style="margin-bottom: 32px;">
+          <img src="./static/images/training_free_tab.png" alt="Training-free methods comparison">
+        </figure>
+        <p class="has-text-justified" style="margin-top: 12px; margin-bottom: 48px;">
+          <strong>Comparison of training-free methods on the LLP dataset, reporting AVVP metrics.</strong>
+        </p>
+
+        <figure class="image" style="margin-bottom: 32px;">
+          <img src="./static/images/zs_baselines.png" alt="Zero-shot methods comparison">
+        </figure>
+        <p class="has-text-justified" style="margin-top: 12px;">
+          <strong>Comparison with zero-shot methods on AVE datasets, reporting AVEL metrics.</strong>
+        </p>
       </div>
     </div>
-    <p class="has-text-centered" style="color:#666;margin-top:8px;">
-      Replace the placeholder images in <code>static/images/</code> with your actual tables/plots exported as PNGs.
-    </p>
+  </div>
+</section>
+
+<!-- Qualitative Results -->
+<section class="section">
+  <div class="container is-max-desktop">
+    <h2 class="title is-3 has-text-centered">Qualitative Results</h2>
+    <div class="columns is-centered">
+      <div class="column is-10">
+        <figure class="image" style="margin-bottom: 32px;">
+          <img src="./static/images/wins&losses.png" alt="Qualitative analysis of AV2A">
+        </figure>
+        <p class="has-text-justified" style="margin-top: 12px;">
+          <strong>Performance analysis of AV<sup>2</sup>A, based on the LanguageBind [37] model, showcasing predictions on audio-visual events, specifically those occurring simultaneously in both audio and video.</strong> Comparisons highlight (a) improvements and (b) failure-cases relative to state-of-the-art weakly supervised baselines.
+        </p>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -189,11 +220,15 @@
 <section class="section" id="BibTeX">
   <div class="container is-max-desktop content">
     <h2 class="title">BibTeX</h2>
-<pre><code>@inproceedings{shaar2025av2a,
-  title     = {Adapting to the Unknown: Training-Free Audio-Visual Event Perception with Dynamic Thresholds},
-  author    = {Shaar, Eitan and Shaulov, Ariel and Chechik, Gal and Wolf, Lior},
-  booktitle = {Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition},
-  year      = {2025}
+<pre><code>@misc{shaar2025adaptingunknowntrainingfreeaudiovisual,
+      title={Adapting to the Unknown: Training-Free Audio-Visual Event Perception with Dynamic Thresholds}, 
+      author={Eitan Shaar and Ariel Shaulov and Gal Chechik and Lior Wolf},
+      year={2025},
+      eprint={2503.13693},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2503.13693}, 
+}
 }</code></pre>
   </div>
 </section>
